@@ -31,6 +31,7 @@ push() {
     
     FILES_TO_SYNC=(
         "$HOME/.bashrc"
+        "$HOME/.bash_profile"
         "$HOME/.gitconfig"
         "$HOME/.gitignore"
         "$HOME/.ssh/config"
@@ -65,6 +66,7 @@ pull() {
     git pull origin main
     
     cp -v "$REPO_DIR/.bashrc" "$HOME/.bashrc"
+    cp -v "$REPO_DIR/.bash_profile" "$HOME/.bash_profile"
     cp -v "$REPO_DIR/.gitconfig" "$HOME/.gitconfig"
     cp -v "$REPO_DIR/.gitignore" "$HOME/.gitignore"
     

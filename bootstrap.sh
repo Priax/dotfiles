@@ -36,10 +36,6 @@ error_exit() {
         cp "$HOME/.ssh/config" "$BACKUP_DIR/ssh_config_backup_$DATE"
     fi
     
-    if [ -f "$HOME/.gnupg/gpg.conf" ]; then
-        cp "$HOME/.gnupg/gpg.conf" "$BACKUP_DIR/gpg.conf_backup_$DATE"
-    fi
-    
     echo -e "${GREEN}Sauvegarde terminée dans $BACKUP_DIR${NC}"
 }
 
@@ -54,11 +50,6 @@ install_dependencies() {
     if ! command -v nvim &> /dev/null; then
         echo -e "${BLUE}Installation de neovim...${NC}"
         sudo apt-get install -y neovim
-    fi
-    
-    if ! command -v gnupg &> /dev/null; then
-        echo -e "${BLUE}Installation de gnupg...${NC}"
-        sudo apt-get install -y gnupg
     fi
     
     echo -e "${GREEN}Dependencies installed${NC}"
@@ -101,7 +92,6 @@ setup_neovim() {
     fi
 }
 
-# Fonction pour afficher un résumé
 summary() {
     echo -e "${GREEN}"
     echo "╔════════════════════════════════════════════════════════════╗"
