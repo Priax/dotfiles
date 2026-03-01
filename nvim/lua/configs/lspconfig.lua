@@ -1,46 +1,41 @@
--- load defaults i.e lua_lsp
 require("nvchad.configs.lspconfig").defaults()
 
--- EXAMPLE
-local servers = { "html", "cssls" }
-local nvlsp = require "nvchad.configs.lspconfig"
+local servers = { "html", "cssls", "ts_ls", "rust_analyzer" }
 
--- lsps with default config
-for _, lsp in ipairs(servers) do
-    vim.lsp.config(lsp, {
-        on_attach = nvlsp.on_attach,
-        on_init = nvlsp.on_init,
-        capabilities = nvlsp.capabilities,
-    })
-end
+-- local lspconfig = require "lspconfig" -- soon to be deprecated, to change to "vim.lsp.config"
+local on_attach = require("nvchad.configs.lspconfig").on_attach
+local capabilities = require("nvchad.configs.lspconfig").capabilities
 
--- configuring single server, example: typescript
-vim.lsp.config("ts_ls", {
-    on_attach = nvlsp.on_attach,
-    on_init = nvlsp.on_init,
-    capabilities = nvlsp.capabilities,
-})
+-- HTML
+vim.lsp.config.html = {
+  on_attach = on_attach,
+  capabilities = capabilities,
+}
 
-vim.lsp.config("eslint", {
-    on_attach = function(client, bufnr)
-        nvlsp.on_attach(client, bufnr)
-        vim.api.nvim_create_autocmd("BufWritePre", {
-            buffer = bufnr,
-            command = "EslintFixAll",
-        })
-    end,
-    on_init = nvlsp.on_init,
-    capabilities = nvlsp.capabilities,
-})
+-- CSS
+vim.lsp.config.cssls = {
+  on_attach = on_attach,
+  capabilities = capabilities,
+}
 
-vim.lsp.config("rust_analyzer", {
-    on_attach = nvlsp.on_attach,
-    on_init = nvlsp.on_init,
-    capabilities = nvlsp.capabilities,
-    settings = {
-        ["rust-analyzer"] = {
-            cargo = { allFeatures = true },
-            procMacro = { enable = true },
-        },
+-- TypeScript / JavaScript
+vim.lsp.config.tsserver = {
+  on_attach = on_attach,
+  capabilities = capabilities,
+}
+
+-- Rust
+vim.lsp.config.rust_analyzer = {
+  on_attach = on_attach,
+  capabilities = capabilities,
+  settings = {
+    ["rust-analyzer"] = {
+      cargo = { allFeatures = true },
+      checkOnSave = true,
     },
-})
+  },
+}
+
+vim.lsp.enable(servers)
+
+-- read :h vim.lsp.config for changing options of lsp servers 
