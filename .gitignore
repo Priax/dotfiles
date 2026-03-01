@@ -1,0 +1,79 @@
+# Global .gitignore for Linux
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C/C++
+*.o
+*.ko
+*.out
+*.so
+*.la
+*.lo
+*.a
+*.obj
+
+# Logs and databases
+*.log
+*.sqlite
+*.sqlite3
+*.db
+*.sqlite-journal
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Runtime files
+*.swp
+*.swo
+*.bak
+*.tmp
+*.old
+*.backup
+*.cache
+*.aux
+*.idx
+*.log
+*.blg
+*.bbl
+*.out
+*.toc
+*.lot
+*.lof
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.gz
+
+# Node.js
+node_modules/
+npm-debug.log*
+.yarn-integrity
+.yarn-metadata.json
+
+# Environment files
+.env
+.env.local
+.env*.local
+
+# IDE/Editor
+.idea/
+.vscode/
+*.sublime-workspace
+*.sublime-project
+
+# SSH and GPG
+*.pub
+*.sec
+*.gpg
+
+# Linux
+*.so.*.bak
