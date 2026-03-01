@@ -28,8 +28,8 @@ error_exit() {
         cp "$HOME/.gitconfig" "$BACKUP_DIR/.gitconfig_backup_$DATE"
     fi
     
-    if [ -f "$HOME/.gitignore_global" ]; then
-        cp "$HOME/.gitignore_global" "$BACKUP_DIR/.gitignore_global_backup_$DATE"
+    if [ -f "$HOME/.gitignore" ]; then
+        cp "$HOME/.gitignore" "$BACKUP_DIR/.gitignore_backup_$DATE"
     fi
     
     if [ -f "$HOME/.ssh/config" ]; then
@@ -71,39 +71,28 @@ clone_repo() {
     fi
 }
 
-# Fonction pour déployer les dotfiles
 deploy_dotfiles() {
     echo -e "${YELLOW}Déploiement des dotfiles...${NC}"
     
-    # Créer les répertoires nécessaires
     mkdir -p "$HOME/.ssh"
-    mkdir -p "$HOME/.gnupg"
     
-    # Copier les fichiers
     cp -v "$REPO_DIR/.bashrc" "$HOME/.bashrc"
     cp -v "$REPO_DIR/.gitconfig" "$HOME/.gitconfig"
-    cp -v "$REPO_DIR/.gitignore_global" "$HOME/.gitignore_global"
+    cp -v "$REPO_DIR/.gitignore" "$HOME/.gitignore"
     cp -v "$REPO_DIR/.ssh/config" "$HOME/.ssh/config"
-    cp -v "$REPO_DIR/.gnupg/gpg.conf" "$HOME/.gnupg/gpg.conf"
     
-    # Configurer les permissions
     chmod 600 "$HOME/.ssh/config"
-    chmod 600 "$HOME/.gnupg/gpg.conf"
     
-    # Configurer git pour utiliser le .gitignore global
-    git config --global core.excludesfile "$HOME/.gitignore_global"
+    git config --global core.excludesfile "$HOME/.gitignore"
     
     echo -e "${GREEN}Dotfiles déployés avec succès !${NC}"
 }
 
-# Fonction pour configurer Neovim
 setup_neovim() {
     echo -e "${YELLOW}Configuration de Neovim...${NC}"
     
-    # Créer les répertoires nécessaires
     mkdir -p "$HOME/.config/nvim"
     
-    # Copier la configuration Neovim
     if [ -d "$REPO_DIR/nvim" ]; then
         cp -r "$REPO_DIR/nvim/"* "$HOME/.config/nvim/"
         echo -e "${GREEN}Configuration Neovim déployée${NC}"
@@ -122,10 +111,9 @@ summary() {
     echo "Les fichiers suivants ont été installés :"
     echo "  - ~/.bashrc"
     echo "  - ~/.gitconfig"
-    echo "  - ~/.gitignore_global"
+    echo "  - ~/.gitignore"
     echo "  - ~/.ssh/config"
-    echo "  - ~/.gnupg/gpg.conf"
-    echo "  - ~/.config/nvim/ (si présent)"
+    echo "  - ~/.config/nvim/"
     echo ""
     echo "Une sauvegarde des fichiers existants a été créée dans :"
     echo "  $BACKUP_DIR"
@@ -135,7 +123,6 @@ summary() {
     echo "${NC}"
 }
 
-# Vérifier si le script est exécuté en tant que root
 if [ "$(id -u)" -eq 0 ]; then
     error_exit "Ce script ne doit pas être exécuté en tant que root"
 fi
@@ -153,7 +140,6 @@ if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     exit 0
 fi
 
-# Exécuter les étapes
 echo -e "${YELLOW}Démarrage de l'installation...${NC}"
 backup
 install_dependencies
