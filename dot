@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# dot — gestion des dotfiles à partir de ./manifest
+# dot gestion des dotfiles à partir de ./manifest
 #
 #   dot status    état de chaque fichier (machine vs repo)
 #   dot diff [p]  diff détaillé (optionnellement filtré sur p)
@@ -105,7 +105,6 @@ save_one() {
     printf '  %s\n' "$(pretty "$sys")"
 }
 
-# Commande en échec : on garde l'ancienne liste. Sortie vide : on la supprime.
 dump() {
     local out=$1
     shift

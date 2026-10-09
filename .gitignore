@@ -1,4 +1,3 @@
-# Fichiers temporaires / sauvegardes
 *.swp
 *.swo
 *.bak
@@ -7,7 +6,6 @@
 *.old
 .DS_Store
 
-# Secrets : ne jamais commiter
 .env
 .env.*
 *.pem
@@ -16,7 +14,6 @@ id_*
 !id_*.pub
 .pgpass
 
-# Repo public
 home/.ssh/
 home/.aws/
 home/.local/share/fonts/

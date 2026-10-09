@@ -1,5 +1,4 @@
 # ~/chemin → home/chemin, /chemin → system/chemin (sudo), « / » final = dossier.
-# Repo public : rien de personnel ni de secret ici (ssh, clés, tokens, .pgpass…).
 
 ~/.bashrc
 ~/.bash_profile

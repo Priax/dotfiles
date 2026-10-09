@@ -5,7 +5,8 @@
 
 set -euo pipefail
 
-# Clone en HTTPS (pas encore de clé SSH), push en SSH.
+# Sur une machine neuve, aucune clé SSH n'est encore liée à GitHub : on clone
+# en HTTPS (public, sans authentification) et on garde SSH pour les push.
 REPO_URL="${DOTFILES_REPO:-https://github.com/Priax/dotfiles.git}"
 REPO_DIR="${DOTFILES_DIR:-$HOME/delivery/dotfiles}"
 

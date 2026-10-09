@@ -1,6 +1,6 @@
 # dotfiles
 
-Config perso (Fedora) : bash, fish, git, nvim, kitty, docker, postgresql…
+Config perso (Fedora): bash, fish, git, nvim, kitty, docker, postgresql…
 
 ## Organisation
 
