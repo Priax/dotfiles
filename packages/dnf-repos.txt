@@ -1,0 +1,11 @@
+code
+docker-ce-stable
+fedora
+fedora-cisco-openh264
+mullvad-stable
+pgAdmin4
+rpmfusion-free
+rpmfusion-free-updates
+rpmfusion-nonfree
+rpmfusion-nonfree-updates
+updates

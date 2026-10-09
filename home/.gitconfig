@@ -1,0 +1,7 @@
+[user]
+	name = Priax
+	email = priax.xairp@gmail.com
+[init]
+	defaultBranch = main
+[diff]
+	tool = nvimdiff

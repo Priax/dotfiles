@@ -1,0 +1,28 @@
+# ~/chemin → home/chemin, /chemin → system/chemin (sudo), « / » final = dossier.
+# Repo public : rien de personnel ni de secret ici (ssh, clés, tokens, .pgpass…).
+
+~/.bashrc
+~/.bash_profile
+~/.profile
+~/.config/fish/
+
+~/.gitconfig
+~/.config/git/ignore
+
+~/.config/nvim/
+~/.config/kitty/kitty.conf
+~/.config/kitty/current-theme.conf
+
+~/.clang-format
+~/.gdbinit
+
+~/.config/mimeapps.list
+~/.config/fcitx5/profile
+~/.config/fcitx5/config
+
+/etc/docker/daemon.json
+
+/var/lib/pgsql/data/postgresql.conf
+/var/lib/pgsql/data/postgresql.auto.conf
+/var/lib/pgsql/data/pg_hba.conf
+/var/lib/pgsql/data/pg_ident.conf

@@ -1,0 +1,47 @@
+[Groups/0]
+# Group Name
+Name="Groupe 3"
+# Layout
+Default Layout=cn
+# Default Input Method
+DefaultIM=keyboard-cn
+
+[Groups/0/Items/0]
+# Name
+Name=keyboard-cn
+# Layout
+Layout=
+
+[Groups/1]
+# Group Name
+Name="Groupe 2"
+# Layout
+Default Layout=fr-oss
+# Default Input Method
+DefaultIM=keyboard-fr-oss
+
+[Groups/1/Items/0]
+# Name
+Name=keyboard-fr-oss
+# Layout
+Layout=
+
+[Groups/2]
+# Group Name
+Name="Groupe 1"
+# Layout
+Default Layout=us
+# Default Input Method
+DefaultIM=keyboard-us
+
+[Groups/2/Items/0]
+# Name
+Name=keyboard-us
+# Layout
+Layout=
+
+[GroupOrder]
+0="Groupe 2"
+1="Groupe 3"
+2="Groupe 1"
+

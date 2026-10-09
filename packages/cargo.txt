@@ -1,0 +1,16 @@
+cargo-audit
+cargo-binutils
+cargo-clean-recursive
+cargo-edit
+cargo-generate
+cargo-make
+cargo-watch
+create-tauri-app
+flamegraph
+itm
+microserver
+sqlx-cli
+tauri-cli
+trunk
+wasm-bindgen-cli
+wasm-pack

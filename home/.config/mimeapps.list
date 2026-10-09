@@ -1,0 +1,9 @@
+[Added Associations]
+text/markdown=okularApplication_md.desktop;org.kde.kwrite.desktop;okularApplication_txt.desktop;libreoffice-writer.desktop;nvim.desktop;
+video/x-matroska=vlc.desktop;org.kde.dragonplayer.desktop;
+
+[Default Applications]
+text/markdown=okularApplication_md.desktop;
+video/x-matroska=vlc.desktop;
+x-scheme-handler/discord=vesktop.desktop
+x-scheme-handler/claude-cli=claude-code-url-handler.desktop

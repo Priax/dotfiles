@@ -1,0 +1,367 @@
+#!/usr/bin/env bash
+# dot — gestion des dotfiles à partir de ./manifest
+#
+#   dot status    état de chaque fichier (machine vs repo)
+#   dot diff [p]  diff détaillé (optionnellement filtré sur p)
+#   dot save      copie machine → repo (+ listes de paquets), sans git
+#   dot push      save + commit + git push
+#   dot apply     copie repo → machine (avec sauvegarde de l'existant)
+#   dot pull      git pull + apply
+#   dot install   nouvelle machine : dépendances + apply + paquets
+
+set -euo pipefail
+
+REPO_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+MANIFEST="$REPO_DIR/manifest"
+BACKUP_DIR="$HOME/dotfiles_backup/$(date +%Y%m%d_%H%M%S)"
+EXCLUDES=('*.bak' '*.save' '*.swp' '.git' 'fish_variables')
+
+RED=$'\033[0;31m'
+GREEN=$'\033[0;32m'
+YELLOW=$'\033[1;33m'
+BLUE=$'\033[0;34m'
+DIM=$'\033[2m'
+NC=$'\033[0m'
+
+info() { printf '%s\n' "${YELLOW}$*${NC}"; }
+ok() { printf '%s\n' "${GREEN}$*${NC}"; }
+warn() { printf '%s\n' "${RED}$*${NC}" >&2; }
+die() {
+    warn "Erreur: $*"
+    exit 1
+}
+have() { command -v "$1" &>/dev/null; }
+ask() {
+    local reply
+    read -r -p "$1 (y/N) " reply
+    [[ $reply =~ ^[YyOo]$ ]]
+}
+
+# Une ligne « chemin_machine<TAB>chemin_repo » par entrée du manifest.
+entries() {
+    local line
+    while IFS= read -r line || [[ -n $line ]]; do
+        line="${line%%#*}"
+        line="$(sed 's/^[[:space:]]*//; s/[[:space:]]*$//' <<<"$line")"
+        [[ -z $line ]] && continue
+        case $line in
+            "~/"*) printf '%s\t%s\n' "$HOME/${line#\~/}" "$REPO_DIR/home/${line#\~/}" ;;
+            /*) printf '%s\t%s\n' "$line" "$REPO_DIR/system$line" ;;
+            *) warn "Entrée ignorée (doit commencer par ~/ ou /) : $line" ;;
+        esac
+    done <"$MANIFEST"
+}
+
+pretty() { sed "s|^$HOME|~|" <<<"$1"; }
+
+is_home() { [[ $1 == "$HOME"/* ]]; }
+
+read_file() {
+    cat "$1" 2>/dev/null && return
+    is_home "$1" && return 1
+    sudo cat "$1" 2>/dev/null
+}
+
+sys_exists() {
+    [[ -e $1 ]] && return
+    is_home "$1" && return 1
+    sudo test -e "$1" 2>/dev/null
+}
+
+rsync_excludes() {
+    local e
+    for e in "${EXCLUDES[@]}"; do printf -- '--exclude=%s\n' "$e"; done
+}
+
+diff_excludes() {
+    local e
+    for e in "${EXCLUDES[@]}"; do printf -- '-x\n%s\n' "$e"; done
+}
+
+
+save_one() {
+    local sys=$1 repo=$2
+    if [[ $sys == */ ]]; then
+        if [[ ! -d $sys ]]; then
+            warn "  absent : $(pretty "$sys")"
+            return
+        fi
+        mkdir -p "$repo"
+        mapfile -t ex < <(rsync_excludes)
+        rsync -a --delete --delete-excluded "${ex[@]}" "$sys" "$repo"
+    else
+        mkdir -p "$(dirname "$repo")"
+        local tmp
+        tmp="$(mktemp)"
+        if read_file "$sys" >"$tmp"; then
+            mv "$tmp" "$repo"
+            [[ -r $sys && -O $sys ]] && chmod --reference="$sys" "$repo"
+        else
+            rm -f "$tmp"
+            warn "  illisible ou absent : $(pretty "$sys")"
+            return
+        fi
+    fi
+    printf '  %s\n' "$(pretty "$sys")"
+}
+
+# Commande en échec : on garde l'ancienne liste. Sortie vide : on la supprime.
+dump() {
+    local out=$1
+    shift
+    local tmp
+    tmp="$(mktemp)"
+    if ! "$@" >"$tmp" 2>/dev/null; then
+        rm -f "$tmp"
+        warn "  échec, liste conservée : ${out#"$REPO_DIR"/}"
+    elif [[ -s $tmp ]]; then
+        mv "$tmp" "$out"
+        printf '  %s (%s)\n' "${out#"$REPO_DIR"/}" "$(wc -l <"$out")"
+    else
+        rm -f "$tmp" "$out"
+    fi
+}
+
+pkg_dnf() { dnf repoquery --userinstalled --leaves --qf '%{name}\n' | sort -u; }
+pkg_dnf_repos() { dnf repolist --enabled | awk 'NR>1 {print $1}' | sort -u; }
+pkg_flatpak() { flatpak list --app --columns=application | sort -u; }
+pkg_cargo() { cargo install --list | awk '/^[^ ]/ {print $1}'; }
+pkg_uv() { uv tool list | awk '/^[^- ]/ {print $1}'; }
+pkg_pip() { pip list --user --not-required --format=freeze | cut -d= -f1; }
+pkg_npm() {
+    npm ls -g --depth=0 --parseable | tail -n +2 | sed 's|.*/node_modules/||' |
+        { grep -vxE 'npm|corepack' || true; }
+}
+
+export_packages() {
+    info "Export des listes de paquets..."
+    local d="$REPO_DIR/packages"
+    mkdir -p "$d"
+    have dnf && dump "$d/dnf.txt" pkg_dnf
+    have dnf && dump "$d/dnf-repos.txt" pkg_dnf_repos
+    have flatpak && dump "$d/flatpak.txt" pkg_flatpak
+    have cargo && dump "$d/cargo.txt" pkg_cargo
+    have uv && dump "$d/uv-tools.txt" pkg_uv
+    have pip && dump "$d/pip.txt" pkg_pip
+    have npm && dump "$d/npm-global.txt" pkg_npm
+    return 0
+}
+
+cmd_save() {
+    info "Copie machine → repo..."
+    local sys repo
+    while IFS=$'\t' read -r sys repo; do
+        save_one "$sys" "$repo"
+    done < <(entries)
+    export_packages
+}
+
+check_secrets() {
+    local pattern='BEGIN [A-Z ]*PRIVATE KEY|aws_secret_''access_key|ghp_[A-Za-z0-9]{20,}|github_''pat_|xox[abp]-'
+    local hits
+    hits="$(git -C "$REPO_DIR" diff --cached -U0 | grep -E '^\+' | grep -E "$pattern" || true)"
+    if [[ -n $hits ]]; then
+        git -C "$REPO_DIR" reset -q
+        warn "Ce qui ressemble à un secret a été détecté, commit annulé :"
+        printf '%s\n' "$hits" | cut -c1-80 >&2
+        exit 1
+    fi
+}
+
+cmd_push() {
+    cmd_save
+    cd "$REPO_DIR"
+    git add -A
+    if git diff --cached --quiet; then
+        ok "Rien à commiter, les dotfiles sont à jour."
+        return
+    fi
+    check_secrets
+    git --no-pager diff --cached --stat
+    git commit -q -m "sync: $(hostname -s) $(date '+%Y-%m-%d %H:%M')" \
+        -m "$(git diff --cached --stat | tail -n 1)"
+    git push -q origin HEAD
+    ok "Dotfiles commités et poussés."
+}
+
+
+differs() {
+    local sys=$1 repo=$2
+    if [[ $repo == */ ]]; then
+        mapfile -t ex < <(diff_excludes)
+        ! diff -rq "${ex[@]}" "$repo" "$sys" &>/dev/null
+    else
+        ! cmp -s "$repo" <(read_file "$sys")
+    fi
+}
+
+backup_one() {
+    local sys=$1 dest
+    if [[ $sys == "$HOME"/* ]]; then
+        dest="$BACKUP_DIR/home/${sys#"$HOME"/}"
+    else
+        dest="$BACKUP_DIR/system$sys"
+    fi
+    dest="${dest%/}"
+    mkdir -p "$(dirname "$dest")"
+    if [[ $sys == */ ]]; then
+        cp -a "$sys" "$dest"
+    else
+        read_file "$sys" >"$dest"
+    fi
+}
+
+apply_one() {
+    local sys=$1 repo=$2
+    if [[ ! -e ${repo%/} ]]; then
+        warn "  pas dans le repo : $(pretty "$sys")"
+        return
+    fi
+    # Ne jamais créer de dossier système : /var/lib/pgsql/data créé par nous
+    # ferait échouer « postgresql-setup --initdb ».
+    local parent
+    parent="$(dirname "${sys%/}")"
+    if ! is_home "$sys" && [[ ! -d $parent ]] && ! sudo test -d "$parent"; then
+        warn "  ignoré, $parent n'existe pas (service pas encore installé ?)"
+        return
+    fi
+    if ! sys_exists "${sys%/}"; then
+        :
+    elif ! differs "$sys" "$repo"; then
+        return
+    else
+        backup_one "$sys"
+    fi
+
+    if [[ $sys == */ ]]; then
+        mkdir -p "$sys"
+        mapfile -t ex < <(rsync_excludes)
+        rsync -a "${ex[@]}" "$repo" "$sys"
+    elif [[ $sys == "$HOME"/* ]]; then
+        mkdir -p "$(dirname "$sys")"
+        cp "$repo" "$sys"
+    else
+        # cp sur un fichier existant conserve son propriétaire et ses droits
+        sudo cp "$repo" "$sys"
+    fi
+    printf '  %s\n' "$(pretty "$sys")"
+}
+
+cmd_apply() {
+    info "Copie repo → machine (sauvegarde dans $(pretty "$BACKUP_DIR"))..."
+    local sys repo
+    while IFS=$'\t' read -r sys repo; do
+        apply_one "$sys" "$repo"
+    done < <(entries)
+    if [[ -d $HOME/.ssh ]]; then
+        chmod 700 "$HOME/.ssh"
+        [[ -f $HOME/.ssh/config ]] && chmod 600 "$HOME/.ssh/config"
+    fi
+    ok "Terminé. Pense à redémarrer docker/postgresql si leur config a changé."
+}
+
+cmd_pull() {
+    git -C "$REPO_DIR" pull --ff-only
+    cmd_apply
+}
+
+
+cmd_status() {
+    local sys repo state
+    while IFS=$'\t' read -r sys repo; do
+        if [[ $sys != "$HOME"/* && ! -r ${sys%/} ]] && ! sudo -n true 2>/dev/null; then
+            state="${DIM}? (sudo requis, lance « sudo -v » avant)"
+        elif [[ ! -e ${repo%/} ]] && ! sys_exists "${sys%/}"; then
+            state="${RED}absent partout"
+        elif [[ ! -e ${repo%/} ]]; then
+            state="${YELLOW}pas encore sauvegardé"
+        elif ! sys_exists "${sys%/}"; then
+            state="${YELLOW}absent de la machine"
+        elif differs "$sys" "$repo"; then
+            state="${YELLOW}modifié"
+        else
+            state="${GREEN}ok"
+        fi
+        printf '  %-45s %s%s\n' "$(pretty "$sys")" "$state" "$NC"
+    done < <(entries)
+}
+
+cmd_diff() {
+    local filter=${1:-} sys repo tmp
+    while IFS=$'\t' read -r sys repo; do
+        [[ -n $filter && $sys != *"$filter"* ]] && continue
+        [[ -e ${repo%/} ]] || continue
+        if [[ $sys == */ || -r $sys ]]; then
+            git --no-pager diff --no-index --color=auto -- "${repo%/}" "${sys%/}" || true
+        else
+            tmp="$(mktemp)"
+            read_file "$sys" >"$tmp" || true
+            git --no-pager diff --no-index --color=auto -- "$repo" "$tmp" || true
+            rm -f "$tmp"
+        fi
+    done < <(entries)
+}
+
+
+install_packages() {
+    local d="$REPO_DIR/packages"
+    if [[ -s $d/dnf-repos.txt ]]; then
+        info "Dépôts utilisés sur l'ancienne machine (rpmfusion, docker-ce…) :"
+        tr '\n' ' ' <"$d/dnf-repos.txt"
+        echo
+        info "Les paquets venant de dépôts non configurés seront ignorés."
+    fi
+    if [[ -s $d/dnf.txt ]] && ask "Installer les paquets dnf ($(wc -l <"$d/dnf.txt")) ?"; then
+        xargs -a "$d/dnf.txt" sudo dnf install -y --skip-unavailable
+    fi
+    if [[ -s $d/flatpak.txt ]] && have flatpak && ask "Installer les flatpaks ?"; then
+        xargs -a "$d/flatpak.txt" flatpak install -y flathub
+    fi
+    if [[ -s $d/cargo.txt ]] && have cargo && ask "Installer les outils cargo ?"; then
+        xargs -a "$d/cargo.txt" -n1 cargo install || true
+    fi
+    if [[ -s $d/uv-tools.txt ]] && have uv && ask "Installer les outils uv ?"; then
+        xargs -a "$d/uv-tools.txt" -n1 uv tool install || true
+    fi
+    if [[ -s $d/npm-global.txt ]] && have npm && ask "Installer les paquets npm globaux ?"; then
+        xargs -a "$d/npm-global.txt" npm install -g || true
+    fi
+    if [[ -s $d/pip.txt ]] && have pip && ask "Installer les paquets pip (--user) ?"; then
+        xargs -a "$d/pip.txt" pip install --user || true
+    fi
+}
+
+cmd_install() {
+    [[ $(id -u) -eq 0 ]] && die "ne pas lancer en root"
+    info "Installation des dépendances de base..."
+    sudo dnf install -y git rsync fish neovim kitty
+
+    cmd_apply
+    install_packages
+
+    mkdir -p "$HOME/.local/bin"
+    ln -sf "$REPO_DIR/dot" "$HOME/.local/bin/dot"
+    ok "Commande « dot » disponible dans ~/.local/bin"
+
+    if [[ $(getent passwd "$USER" | cut -d: -f7) != */fish ]] && ask "Passer à fish comme shell par défaut ?"; then
+        chsh -s "$(command -v fish)"
+    fi
+    ok "Installation terminée."
+}
+
+usage() {
+    sed -n '2,10s/^# \{0,1\}//p' "${BASH_SOURCE[0]}"
+    exit "${1:-0}"
+}
+
+case "${1:-}" in
+    status | st) cmd_status ;;
+    diff) cmd_diff "${2:-}" ;;
+    save) cmd_save ;;
+    push) cmd_push ;;
+    apply) cmd_apply ;;
+    pull) cmd_pull ;;
+    install) cmd_install ;;
+    -h | --help | help) usage ;;
+    *) usage 1 ;;
+esac
