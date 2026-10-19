@@ -15,6 +15,54 @@ return {
 
     -- test new blink
     -- { import = "nvchad.blink.lazyspec" },
+
+    -- Tronque la colonne signature du menu pour laisser la place à la doc
+    {
+        "hrsh7th/nvim-cmp",
+        opts = function(_, opts)
+            local format = opts.formatting.format
+            opts.formatting.format = function(entry, item)
+                item = format(entry, item)
+                if item.menu and vim.fn.strchars(item.menu) > 30 then
+                    item.menu = vim.fn.strcharpart(item.menu, 0, 30) .. "…"
+                end
+                return item
+            end
+            opts.window.documentation.max_width = 80
+
+            -- .mdx : <Tab> / <S-Tab> parcourent les champs fantômes, <CR> écrit celui sélectionné
+            local cmp = require "cmp"
+            local mdx_props = require "configs.mdx_props"
+            local confirm = cmp.mapping.confirm { behavior = cmp.ConfirmBehavior.Insert, select = true }
+            opts.mapping["<Tab>"] = cmp.mapping(function(fallback)
+                if mdx_props.select(1) then
+                    return
+                elseif cmp.visible() then
+                    cmp.select_next_item()
+                elseif require("luasnip").expand_or_jumpable() then
+                    require("luasnip").expand_or_jump()
+                else
+                    fallback()
+                end
+            end, { "i", "s" })
+            opts.mapping["<S-Tab>"] = cmp.mapping(function(fallback)
+                if mdx_props.select(-1) then
+                    return
+                elseif cmp.visible() then
+                    cmp.select_prev_item()
+                elseif require("luasnip").jumpable(-1) then
+                    require("luasnip").jump(-1)
+                else
+                    fallback()
+                end
+            end, { "i", "s" })
+            opts.mapping["<CR>"] = cmp.mapping(function(fallback)
+                if not mdx_props.accept() then
+                    confirm(fallback)
+                end
+            end, { "i", "s" })
+        end,
+    },
     {
         "nvim-treesitter/nvim-treesitter",
         opts = {

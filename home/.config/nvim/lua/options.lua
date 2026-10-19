@@ -66,6 +66,10 @@ vim.opt.colorcolumn = "69"
 o.list = true
 opt.listchars = { tab = "» ", trail = "·", nbsp = "␣" }
 
+-- .mdx (blog) : nvim ne connaît pas l'extension, coloration markdown
+vim.filetype.add { extension = { mdx = "mdx" } }
+vim.treesitter.language.register("markdown", "mdx")
+
 -- zc pour plier, zo pour déplier
 o.foldlevel = 99
 o.foldlevelstart = 99

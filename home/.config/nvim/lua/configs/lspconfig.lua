@@ -1,6 +1,6 @@
 require("nvchad.configs.lspconfig").defaults()
 
-local servers = { "html", "cssls", "ts_ls", "rust_analyzer", "clangd", "hls", "eslint", "gopls" }
+local servers = { "html", "cssls", "ts_ls", "rust_analyzer", "clangd", "hls", "eslint", "gopls", "mdx_analyzer", "astro" }
 
 -- local lspconfig = require "lspconfig" -- soon to be deprecated, to change to "vim.lsp.config"
 local on_attach = require("nvchad.configs.lspconfig").on_attach
@@ -68,9 +68,12 @@ vim.lsp.config.eslint = {
             limit = 1,
             upward = true,
         })[1]
-        config.settings = config.settings or {}
-        config.settings.experimental = config.settings.experimental or {}
-        config.settings.experimental.useFlatConfig = flat_config ~= nil
+        local settings = config.settings or {}
+        local experimental = settings.experimental or {}
+        ---@cast experimental table<string, any>
+        experimental.useFlatConfig = flat_config ~= nil
+        settings.experimental = experimental
+        config.settings = settings
     end,
 }
 
@@ -131,6 +134,29 @@ vim.lsp.config.hls = {
             checkProject = true,
         },
     },
+}
+
+-- MDX
+-- typescript.enabled : sans ça, mdx-analyzer ne fait ni survol (K) ni complétion des composants
+vim.lsp.config.mdx_analyzer = {
+    on_attach = on_attach,
+    capabilities = capabilities,
+    init_options = { typescript = { enabled = true } },
+}
+
+-- Astro, seulement pour le frontmatter des .mdx (contentIntellisense : schémas de
+-- .astro/collections/, générés si experimental.contentIntellisense est activé)
+vim.lsp.config.astro = {
+    on_attach = on_attach,
+    capabilities = capabilities,
+    filetypes = { "mdx" },
+    root_dir = function(bufnr, on_dir)
+        local root = vim.fs.root(bufnr, { "astro.config.mjs", "astro.config.ts", "astro.config.js" })
+        if root then
+            on_dir(root)
+        end
+    end,
+    init_options = { typescript = {}, contentIntellisense = true },
 }
 
 vim.lsp.enable(servers)

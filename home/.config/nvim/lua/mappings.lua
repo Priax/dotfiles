@@ -17,7 +17,7 @@ map("n", "<leader>o", function()
     local file = vim.fn.expand "%:p"
     if file ~= "" then
         vim.ui.open(file)
-        print("Fichier ouvert : " .. file)
+        print("Fichier ouvert: " .. file)
     else
         print "Aucun fichier à ouvrir"
     end
@@ -81,3 +81,20 @@ map("n", "<leader>dq", function()
 end, { desc = "Terminate Debugging" })
 
 map("n", "<leader>hh", "<cmd>Hoogle<cr>", { desc = "Hoogle search" })
+
+-- LSP dans Telescope (remplace les grr/gri/grt/gO natifs de Neovim)
+map("n", "grr", function()
+    require("telescope.builtin").lsp_references()
+end, { desc = "LSP References (Telescope)" })
+
+map("n", "gri", function()
+    require("telescope.builtin").lsp_implementations()
+end, { desc = "LSP Implementations (Telescope)" })
+
+map("n", "grt", function()
+    require("telescope.builtin").lsp_type_definitions()
+end, { desc = "LSP Type Definitions (Telescope)" })
+
+map("n", "gO", function()
+    require("telescope.builtin").lsp_document_symbols()
+end, { desc = "LSP Document Symbols (Telescope)" })
