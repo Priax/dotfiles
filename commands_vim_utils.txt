@@ -1,0 +1,97 @@
+Astuce en or : **`Espace + c + h`** ouvre la cheatsheet intégrée de NvChad !
+
+Pour ouvrir un fichier dans le nvim-tree, appuies sur s avec ton curseur sur le fichier !
+
+## Navigation de Fichiers (Telescope & NvimTree)
+| Raccourci | Action | Explication |
+| :--- | :--- | :--- |
+| **`Espace + f + f`** | Find File | Cherche un fichier par son nom dans le projet. |
+| **`Espace + f + w`** | Find Word (Grep) | Cherche un mot dans le contenu de tous les fichiers. |
+| **`Espace + f + z`** | Fuzz Buffer | Cherche un mot dans le fichier actuellement ouvert. |
+| **`Espace + f + b`** | Find Buffers | Liste les fichiers ouverts pour sauter de l'un à l'autre. |
+| **`Ctrl + n`** | Toggle NvimTree | Ouvre ou ferme l'explorateur de fichiers. |
+| **`Espace + e`** | Focus NvimTree | Place le curseur dans l'explorateur de fichiers. |
+
+## Gestion des Onglets (Buffers)
+| Raccourci | Action |
+| :--- | :--- |
+| **`Tab`** | Aller à l'onglet suivant (droite). |
+| **`Maj + Tab`** | Aller à l'onglet précédent (gauche). |
+| **`Espace + x`** | Fermer l'onglet actuel. |
+
+## Programmation & Code (LSP: Rust, C, ...)
+| Raccourci | Action | Explication |
+| :--- | :--- | :--- |
+| **`gd`** | Go to Definition | Aller à la définition (struct, fonction, macro, etc.). |
+| **`Ctrl + o`** | Jump Back | Revenir en arrière après un `gd` ou un `grr`. |
+| **`grr`** | Go to References | Lister tous les endroits où le symbole est utilisé. |
+| **`gri`** | Go to Implementation | Aller à l'implémentation (trait Rust, etc.). |
+| **`grt`** | Go to Type Definition | Aller à la définition du type de la variable. |
+| **`gO`** | Document Symbols | Lister les fonctions, structs et variables du fichier. |
+| **`K`** | Hover Doc | Afficher la documentation/type sous le curseur. |
+| **`[ + d` / `] + d`**| Prev/Next Diag | Sauter à l'erreur précédente / suivante. |
+| **`gra`** ou **`Espace + c + a`** | Code Action | Corrections suggérées par le LSP. |
+| **`grn`** ou **`Espace + r + a`** | Rename All | Renommer un symbole dans tout le projet. |
+| **`Espace + f + m`** | Format | Formater le fichier (`rustfmt`, `clang-format`). |
+
+Pour renommer une macro, placer son curseur dessus, taper *
+puis :%s//NOUVEAU_NOM/g
+
+## Gestion des Fenêtres (Splits)
+| Raccourci | Action |
+| :--- | :--- |
+| **`:vsp`** | Diviser l'écran verticalement (nouvelle fenêtre à droite). |
+| **`:sp`** | Diviser l'écran horizontalement (nouvelle fenêtre en bas). |
+| **`Ctrl + w + h`** | Aller à la fenêtre de gauche. |
+| **`Ctrl + w + l`** | Aller à la fenêtre de droite. |
+| **`Ctrl + w + j`** | Aller à la fenêtre du bas. |
+| **`Ctrl + w + k`** | Aller à la fenêtre du haut. |
+| **`Ctrl + w + q`** | Fermer la fenêtre actuelle (`:q`). |
+
+## Édition "Vim Ninja"
+| Raccourci | Action | Explication |
+| :--- | :--- | :--- |
+| **`c i w`** | Change In Word | Remplace le mot sous le curseur. |
+| **`d i w`** | Delete In Word | Supprime le mot sous le curseur. |
+| **`d d`** | Delete Line | Coupe/Supprime la ligne entière. |
+| **`y y`** | Yank Line | Copie la ligne entière. |
+| **`p`** | Paste | Colle. |
+| **`u`** | Undo | Annuler (Ctrl+Z). |
+| **`Ctrl + r`**| Redo | Refaire. |
+| **`A`** | Append | Saute à la fin de la ligne en mode Insertion. |
+| **`I`** | Insert | Saute au début de la ligne en mode Insertion. |
+
+## Déplacements rapides sur une ligne (Motions)
+
+| Raccourci | Action | Explication |
+| :--- | :--- | :--- |
+| **`%`** | Match pair | Saute à la parenthèse / crochet / accolade correspondante. |
+| **`w`** | Next word | Avance au début du mot/symbole suivant. |
+| **`W`** | Next WORD | Avance au mot suivant (ignore la ponctuation, saute plus loin). |
+| **`b`** | Back word | Recule au début du mot précédent. |
+| **`e`** | End of word | Avance à la fin du mot. |
+| **`f + [lettre]`** | Find char | Saute sur la prochaine lettre spécifique dans la ligne (ex: `f,` va à la virgule). |
+| **espace + `;`** | Repeat find | Répète la dernière recherche faite avec `f`. |
+
+## Magie de sélection et répétition
+| Raccourci | Action | Explication |
+| :--- | :--- | :--- |
+| **`v i w`** | Visual In Word | Sélectionne (surligne) le mot sous le curseur. |
+| **`*`** | Search Word | Cherche toutes les occurrences du mot sous le curseur. |
+| **`n`** | Next Search | Va à la prochaine occurrence trouvée avec `*` (ou `/`). |
+| **`.`** | Dot Command | Répète la dernière action de modification (ex: refait un `ciw`). |
+| **`Ctrl+r` puis `Ctrl+w`** | Paste Word | En mode Commande (`:`), colle le mot qui est sous le curseur. |
+
+Ouvrir tous les fichiers modifiés / créés sur la branche actuelle:
+nvim $(git diff --name-only --diff-filter=d preprod) $(git ls-files --others --exclude-standard)
+
+pour le C/C++
+créer un compile_flags.txt
+
+-xc
+-std=c11
+-Wall
+-Wextra
+-I.
+
+Ou utiliser bear avec un Makefile ! (pour les CMAKE, regarder la ligne à rajouter dans les assignments de computer graphics)
