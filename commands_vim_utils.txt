@@ -95,3 +95,111 @@ créer un compile_flags.txt
 -I.
 
 Ou utiliser bear avec un Makefile ! (pour les CMAKE, regarder la ligne à rajouter dans les assignments de computer graphics)
+
+Utilisation
+
+codediff
+
+Commandes:
+
+┌─────────────────────────────────────┬──────────────────────────────────────────────────────────────────────────────┐
+│              Commande               │                                    Effet                                     │
+├─────────────────────────────────────┼──────────────────────────────────────────────────────────────────────────────┤
+│ :CodeDiff                           │ modifications non commitées                                                  │
+├─────────────────────────────────────┼──────────────────────────────────────────────────────────────────────────────┤
+│ :CodeDiff --staged                  │ ce qui est stagé                                                             │
+├─────────────────────────────────────┼──────────────────────────────────────────────────────────────────────────────┤
+│ :CodeDiff main                      │ main comparé à ton arbre de travail                                          │
+├─────────────────────────────────────┼──────────────────────────────────────────────────────────────────────────────┤
+│ :CodeDiff main HEAD                 │ deux révisions                                                               │
+├─────────────────────────────────────┼──────────────────────────────────────────────────────────────────────────────┤
+│ :CodeDiff main...                   │ ce que ta branche apporte depuis le point de divergence                      │
+├─────────────────────────────────────┼──────────────────────────────────────────────────────────────────────────────┤
+│ :CodeDiff -- src/api                │ limité à un chemin, combinable avec les autres                               │
+├─────────────────────────────────────┼──────────────────────────────────────────────────────────────────────────────┤
+│ :CodeDiff history                   │ historique des commits                                                       │
+├─────────────────────────────────────┼──────────────────────────────────────────────────────────────────────────────┤
+│ :CodeDiff history %                 │ historique du fichier courant                                                │
+├─────────────────────────────────────┼──────────────────────────────────────────────────────────────────────────────┤
+│ :CodeDiff history origin/main..HEAD │ historique d'une plage                                                       │
+├─────────────────────────────────────┼──────────────────────────────────────────────────────────────────────────────┤
+│ :CodeDiff file HEAD                 │ fichier courant comparé à une révision                                       │
+├─────────────────────────────────────┼──────────────────────────────────────────────────────────────────────────────┤
+│ :CodeDiff file a.txt b.txt          │ deux fichiers                                                                │
+├─────────────────────────────────────┼──────────────────────────────────────────────────────────────────────────────┤
+│ :CodeDiff dir dossier1 dossier2     │ deux dossiers                                                                │
+├─────────────────────────────────────┼──────────────────────────────────────────────────────────────────────────────┤
+│ :CodeDiff pr 512                    │ revue d'une PR GitHub                                                        │
+├─────────────────────────────────────┼──────────────────────────────────────────────────────────────────────────────┤
+│ :CodeDiff --inline                  │ diff en un seul panneau (t bascule ensuite)                                  │
+└─────────────────────────────────────┴──────────────────────────────────────────────────────────────────────────────┘
+
+Dans la vue diff:
+- ]c et [c: hunk suivant ou précédent. ]f et [f: fichier suivant ou précédent.
+- -: stager ou déstager le fichier.
+- <leader>hs, <leader>hu, <leader>hr: stager, déstager ou annuler le hunk sous le curseur.
+- do et dp: récupérer ou envoyer un changement, comme dans vimdiff. ih sélectionne un hunk (vih, yih).
+- t: basculer entre côte à côte et inline. gc: replier le code inchangé. gm: aligner les blocs déplacés.
+- g?: aide. q: fermer.
+
+Dans la liste des fichiers:
+- <CR>: ouvrir le fichier. i: basculer entre liste et arbre.
+- S et U: tout stager ou tout déstager. X: annuler les changements d'un fichier.
+
+Pendant un conflit de merge:
+- ]x et [x: conflit suivant ou précédent.
+- <leader>ct: garder leur version. <leader>co: garder la tienne. <leader>cb: garder les deux. <leader>cx: revenir à la base.
+- Les mêmes touches en majuscule (cT, cO, cB, cX) s'appliquent à tout le fichier.
+
+live-preview (navigateur)
+
+- :LivePreview start: ouvre le fichier courant dans le navigateur, sur 127.0.0.1:5500.
+- :LivePreview start chemin/doc.md: ouvre un autre fichier.
+- :LivePreview pick: choisir le fichier avec telescope.
+- :LivePreview close: arrêter le serveur.
+- Le Markdown se met à jour pendant que tu tapes, sans sauvegarder. Le HTML (avec CSS et JS) se met à jour à chaque sauvegarde.
+- Le défilement du navigateur suit celui de nvim. Il gère les maths KaTeX, les diagrammes Mermaid et la coloration des blocs de code.
+- Après une mise à jour du plugin, vide le cache du navigateur, c'est l'auteur qui le recommande.
+
+render-markdown (buffer)
+
+- Automatique: les titres, tableaux, listes, cases à cocher, citations, callouts, blocs de code et liens sont rendus en mode normal. Tu retrouves le texte brut en mode insertion et sur la ligne du curseur.
+- :RenderMarkdown toggle: activer ou désactiver partout. :RenderMarkdown buf_toggle: seulement pour le buffer courant.
+- :RenderMarkdown preview: le rendu dans une fenêtre à côté, pendant que tu édites le brut.
+- Complétion: après - [, cmp propose les états de case à cocher. Après > [!, il propose les callouts (NOTE, TIP, WARNING…).
+- Dans les .mdx, le Markdown est rendu et les balises JSX restent telles quelles. Comme le rendu ne s'applique pas en mode insertion, il ne gêne pas ton texte fantôme de props.
+
+gx.nvim
+
+- gx en mode normal: ouvre ce qui est sous le curseur. gx en mode visuel: ouvre la sélection.
+- Si la ligne contient plusieurs liens, un menu te demande lequel ouvrir.
+
+- gx en mode normal: ouvre ce qui est sous le curseur. gx en mode visuel: ouvre la sélection.
+- Si la ligne contient plusieurs liens, un menu te demande lequel ouvrir.
+- :Browse <texte> ouvre le texte donné. :Browse sur une plage de lignes ouvre ce qu'elle contient.
+
+Ce que gx reconnaît:
+
+┌──────────────────────────────────┬─────────────────────────────────────────────────────────────────────┐
+│         Sous le curseur          │                                Ouvre                                │
+├──────────────────────────────────┼─────────────────────────────────────────────────────────────────────┤
+│ une URL ou un chemin             │ la page ou le fichier                                               │
+├──────────────────────────────────┼─────────────────────────────────────────────────────────────────────┤
+│ owner/repo#123 ou #123           │ l'issue ou la PR GitHub (dépôt déduit du remote upstream ou origin) │
+├──────────────────────────────────┼─────────────────────────────────────────────────────────────────────┤
+│ "user/repo" dans un .lua ou .vim │ le dépôt GitHub du plugin, pratique dans plugins.lua                │
+├──────────────────────────────────┼─────────────────────────────────────────────────────────────────────┤
+│ un hash de commit                │ le commit sur le remote                                             │
+├──────────────────────────────────┼─────────────────────────────────────────────────────────────────────┤
+│ une dépendance de package.json   │ sa page npm                                                         │
+├──────────────────────────────────┼─────────────────────────────────────────────────────────────────────┤
+│ un import Go                     │ pkg.go.dev                                                          │
+├──────────────────────────────────┼─────────────────────────────────────────────────────────────────────┤
+│ CVE-2024-1234                    │ la fiche de la CVE                                                  │
+├──────────────────────────────────┼─────────────────────────────────────────────────────────────────────┤
+│ PEP 8                            │ la PEP Python                                                       │
+├──────────────────────────────────┼─────────────────────────────────────────────────────────────────────┤
+│ un Brewfile ou Terraform         │ la page du paquet ou du provider                                    │
+├──────────────────────────────────┼─────────────────────────────────────────────────────────────────────┤
+│ un mot quelconque                │ une recherche Google                                                │
+└──────────────────────────────────┴─────────────────────────────────────────────────────────────────────┘

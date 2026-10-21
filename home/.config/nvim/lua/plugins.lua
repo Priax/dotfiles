@@ -63,17 +63,41 @@ return {
             end, { "i", "s" })
         end,
     },
+    -- .mdx / .md : pas de ' auto-fermant (apostrophes du français)
+    {
+        "windwp/nvim-autopairs",
+        config = function(_, opts)
+            local npairs = require "nvim-autopairs"
+            npairs.setup(opts)
+            for _, rule in ipairs(npairs.get_rules "'") do
+                rule.not_filetypes = vim.list_extend(rule.not_filetypes or {}, { "mdx", "markdown" })
+            end
+            npairs.force_attach()
+
+            local cmp_autopairs = require "nvim-autopairs.completion.cmp"
+            require("cmp").event:on("confirm_done", cmp_autopairs.on_confirm_done())
+        end,
+    },
     {
         "nvim-treesitter/nvim-treesitter",
+        branch = "main",
+        lazy = false,
         opts = {
             ensure_installed = {
                 "vim",
                 "lua",
+                "luadoc",
+                "printf",
                 "vimdoc",
+                "markdown",
+                "markdown_inline",
                 "html",
                 "css",
                 "javascript",
                 "typescript",
+                "tsx",
+                "json",
+                "yaml",
                 "rust",
                 "c",
                 "cpp",
@@ -84,20 +108,24 @@ return {
                 "gosum",
                 "gowork",
             },
-            highlight = { enable = true },
-            indent = { enable = true },
         },
     },
 
-    -- 1. Markdown Preview (Aperçu dans le navigateur)
+    -- 1. Aperçu Markdown dans le navigateur
     {
-        "iamcco/markdown-preview.nvim",
-        cmd = { "MarkdownPreviewToggle", "MarkdownPreview", "MarkdownPreviewStop" },
-        ft = { "markdown" },
-        build = "cd app && npm install",
-        init = function()
-            vim.g.mkdp_filetypes = { "markdown" }
-        end,
+        "brianhuster/live-preview.nvim",
+        cmd = "LivePreview",
+    },
+
+    -- Rendu Markdown dans le buffer
+    {
+        "MeanderingProgrammer/render-markdown.nvim",
+        ft = { "markdown", "mdx" },
+        dependencies = { "nvim-treesitter/nvim-treesitter", "nvim-tree/nvim-web-devicons" },
+        opts = {
+            file_types = { "markdown", "mdx" },
+            completions = { lsp = { enabled = true } },
+        },
     },
 
     -- 2. Image.nvim (Affichage des images dans le terminal)
@@ -140,12 +168,18 @@ return {
     },
     {
         "mrcjkb/haskell-tools.nvim",
-        version = "^4",
-        ft = { "haskell", "lhaskell", "cabal" },
-        dependencies = { "nvim-lua/plenary.nvim" },
+        version = "^11",
+        lazy = false,
         init = function()
             vim.g.haskell_tools = {
                 hls = {
+                    settings = {
+                        haskell = {
+                            cabalFormattingProvider = "cabalfmt",
+                            formattingProvider = "fourmolu",
+                            checkProject = true,
+                        },
+                    },
                     on_attach = function(_, bufnr, ht)
                         local opts = { buffer = bufnr }
                         -- Hoogle search mot sous le curseur
@@ -163,7 +197,7 @@ return {
                 },
                 tools = {
                     repl = {
-                        handler = "toggleterm", -- ou "builtin"
+                        handler = "builtin",
                     },
                 },
             }
@@ -178,14 +212,7 @@ return {
         end,
     },
     {
-        "sindrets/diffview.nvim",
-        dependencies = { "nvim-tree/nvim-web-devicons" },
-        cmd = {
-            "DiffviewOpen",
-            "DiffviewClose",
-            "DiffviewToggleFiles",
-            "DiffviewFocusFiles",
-            "DiffviewFileHistory",
-        },
+        "esmuellert/codediff.nvim",
+        cmd = "CodeDiff",
     },
 }

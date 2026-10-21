@@ -80,8 +80,6 @@ map("n", "<leader>dq", function()
     require("dap").terminate()
 end, { desc = "Terminate Debugging" })
 
-map("n", "<leader>hh", "<cmd>Hoogle<cr>", { desc = "Hoogle search" })
-
 -- LSP dans Telescope (remplace les grr/gri/grt/gO natifs de Neovim)
 map("n", "grr", function()
     require("telescope.builtin").lsp_references()

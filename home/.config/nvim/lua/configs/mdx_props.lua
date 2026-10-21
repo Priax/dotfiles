@@ -97,6 +97,34 @@ local function fetch_props(buf, client, row, col, name, callback, on_fail)
     end, buf)
 end
 
+-- Noms des props d'un composant, lus dans src/components/blog/props.ts (nil si composant inconnu)
+local props_ts = {}
+function M.prop_names(buf, name)
+    local root = vim.fs.root(buf, "astro.config.mjs")
+    local path = root and root .. "/src/components/blog/props.ts"
+    local stat = path and vim.uv.fs_stat(path)
+    if not stat then
+        return nil
+    end
+    if props_ts.path ~= path or props_ts.mtime ~= stat.mtime.sec then
+        local text = table.concat(vim.fn.readfile(path), "\n")
+        local types = {}
+        for typ, body in text:gmatch "export interface (%w+) {(.-)\n}" do
+            local set = {}
+            for prop in body:gmatch "\n%s+([%a_][%w_]*)%??:" do
+                set[prop] = true
+            end
+            types[typ] = set
+        end
+        local names = {}
+        for comp, typ in text:gmatch "\n%s+(%u%w*): Component<(%w+)>" do
+            names[comp] = types[typ] or {}
+        end
+        props_ts.path, props_ts.mtime, props_ts.names = path, stat.mtime.sec, names
+    end
+    return props_ts.names[name]
+end
+
 local function close_doc(s)
     if s.win and vim.api.nvim_win_is_valid(s.win) then
         vim.api.nvim_win_close(s.win, true)

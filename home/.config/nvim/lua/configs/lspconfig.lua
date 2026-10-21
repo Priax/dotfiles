@@ -1,8 +1,7 @@
 require("nvchad.configs.lspconfig").defaults()
 
-local servers = { "html", "cssls", "ts_ls", "rust_analyzer", "clangd", "hls", "eslint", "gopls", "mdx_analyzer", "astro" }
+local servers = { "html", "cssls", "ts_ls", "rust_analyzer", "clangd", "eslint", "gopls", "mdx_analyzer", "astro" }
 
--- local lspconfig = require "lspconfig" -- soon to be deprecated, to change to "vim.lsp.config"
 local on_attach = require("nvchad.configs.lspconfig").on_attach
 local capabilities = require("nvchad.configs.lspconfig").capabilities
 
@@ -91,7 +90,7 @@ vim.lsp.config.clangd = {
     cmd = { "clangd", "--background-index" },
     on_attach = on_attach,
     capabilities = capabilities,
-    root_dir = vim.fs.root(0, { ".git", "compile_commands.json", "compile_flags.txt" }),
+    root_markers = { "compile_commands.json", "compile_flags.txt", ".git" },
 }
 
 -- Rust
@@ -118,20 +117,6 @@ vim.lsp.config.gopls = {
                 unusedparams = true,
             },
             staticcheck = true,
-        },
-    },
-}
-
--- Haskell
-vim.lsp.config.hls = {
-    on_attach = on_attach,
-    capabilities = capabilities,
-    filetypes = { "haskell", "lhaskell", "cabal" },
-    settings = {
-        haskell = {
-            cabalFormattingProvider = "cabalfmt",
-            formattingProvider = "fourmolu",
-            checkProject = true,
         },
     },
 }

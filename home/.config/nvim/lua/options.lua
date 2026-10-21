@@ -55,10 +55,6 @@ g.loaded_python3_provider = 0
 g.loaded_perl_provider = 0
 g.loaded_ruby_provider = 0
 
--- utf-8
-vim.opt.encoding = "utf-8"
-vim.opt.fileencoding = "utf-8"
-
 -- line at column 70
 vim.opt.colorcolumn = "69"
 
@@ -73,17 +69,3 @@ vim.treesitter.language.register("markdown", "mdx")
 -- zc pour plier, zo pour déplier
 o.foldlevel = 99
 o.foldlevelstart = 99
-
--- Patch bas-niveau : nvim-treesitter crashe quand un nœud devient stale entre
--- le check (if not node) et l'appel à node:range() dans get_node_text.
--- On enveloppe la fonction pour retourner "" proprement au lieu de crasher.
-do
-    local orig_get_node_text = vim.treesitter.get_node_text
-    ---@diagnostic disable-next-line: duplicate-set-field
-    vim.treesitter.get_node_text = function(node, source, opts_arg)
-        if not node or type(node.range) ~= "function" then
-            return ""
-        end
-        return orig_get_node_text(node, source, opts_arg)
-    end
-end
