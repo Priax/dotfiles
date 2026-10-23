@@ -7,7 +7,7 @@ set -gx EDITOR nvim
 # Défini ici plutôt que dans fish_variables (état local, non versionné)
 set -g fish_greeting 'Stay silly !! <3'
 
-# macOS : Homebrew (absent sur Linux)
+# macOS: Homebrew (absent sur Linux)
 if test -x /opt/homebrew/bin/brew
     /opt/homebrew/bin/brew shellenv fish | source
 end
@@ -16,7 +16,7 @@ fish_add_path -g ~/.local/bin ~/bin $BUN_INSTALL/bin $FLYCTL_INSTALL/bin ~/.ghcu
 fish_add_path -g -a /usr/local/go/bin $GOPATH/bin ~/.cabal/bin
 
 if status is-interactive
-    # Node version manager — falls back to system node when no version is selected
+    # Node version manager: falls back to system node when no version is selected
     if type -q fnm
         fnm env --use-on-cd --shell fish | source
     end
