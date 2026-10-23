@@ -4,7 +4,7 @@
 #   dot status    état de chaque fichier (machine vs repo)
 #   dot diff [p]  diff détaillé (optionnellement filtré sur p)
 #   dot save      copie machine → repo (+ listes de paquets), sans git
-#   dot push      save + commit + git push
+#   dot push      save + commit + git pull --rebase + git push
 #   dot apply     copie repo → machine (avec sauvegarde de l'existant)
 #   dot pull      git pull + apply
 #   dot install   nouvelle machine : dépendances + apply + paquets
@@ -15,6 +15,12 @@ REPO_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
 MANIFEST="$REPO_DIR/manifest"
 BACKUP_DIR="$HOME/dotfiles_backup/$(date +%Y%m%d_%H%M%S)"
 EXCLUDES=('*.bak' '*.save' '*.swp' '.git' 'fish_variables')
+
+case "$(uname -s)" in
+    Darwin) OS=macos ;;
+    *) OS=linux ;;
+esac
+PKG_DIR="$REPO_DIR/packages/$OS"
 
 RED=$'\033[0;31m'
 GREEN=$'\033[0;32m'
@@ -38,9 +44,13 @@ ask() {
 }
 
 # Une ligne « chemin_machine<TAB>chemin_repo » par entrée du manifest.
+# Une entrée suivie de « # linux » ou « # macos » est ignorée sur l'autre OS.
 entries() {
-    local line
+    local line tag
     while IFS= read -r line || [[ -n $line ]]; do
+        tag=""
+        [[ $line == *"#"* ]] && tag="$(sed 's/^[[:space:]]*//; s/[[:space:]]*$//' <<<"${line#*#}")"
+        [[ ($tag == linux || $tag == macos) && $tag != "$OS" ]] && continue
         line="${line%%#*}"
         line="$(sed 's/^[[:space:]]*//; s/[[:space:]]*$//' <<<"$line")"
         [[ -z $line ]] && continue
@@ -137,7 +147,7 @@ pkg_npm() {
 
 export_packages() {
     info "Export des listes de paquets..."
-    local d="$REPO_DIR/packages"
+    local d="$PKG_DIR"
     mkdir -p "$d"
     have dnf && dump "$d/dnf.txt" pkg_dnf
     have dnf && dump "$d/dnf-repos.txt" pkg_dnf_repos
@@ -184,8 +194,19 @@ cmd_push() {
     git --no-pager diff --cached --stat
     git commit -q -m "sync: $(hostname -s) $(date '+%Y-%m-%d %H:%M')" \
         -m "$(git diff --cached --stat | tail -n 1)"
+
+    # Rattrape ce que l'autre machine a poussé entre-temps, sans quoi le push serait refusé.
+    local upstream
+    upstream="$(git rev-parse '@{u}')"
+    git pull -q --rebase ||
+        die "conflit avec l'autre machine: corrige les fichiers (git status), puis « git rebase --continue », « git push » et « dot apply »"
     git push -q origin HEAD
     ok "Dotfiles commités et poussés."
+    # Sinon le prochain push, fait depuis cette machine pas à jour, annulerait ces changements.
+    if [[ $(git rev-parse '@{u}~1') != "$upstream" ]]; then
+        info "Changements de l'autre machine récupérés, installation ici..."
+        cmd_apply
+    fi
 }
 
 
@@ -308,7 +329,7 @@ cmd_diff() {
 
 
 install_packages() {
-    local d="$REPO_DIR/packages"
+    local d="$PKG_DIR"
     if [[ -s $d/dnf-repos.txt ]]; then
         info "Dépôts utilisés sur l'ancienne machine (rpmfusion, docker-ce…) :"
         tr '\n' ' ' <"$d/dnf-repos.txt"
@@ -328,16 +349,16 @@ install_packages() {
         xargs brew install --cask <"$d/brew-cask.txt" || true
     fi
     if [[ -s $d/cargo.txt ]] && have cargo && ask "Installer les outils cargo ?"; then
-        xargs -a "$d/cargo.txt" -n1 cargo install || true
+        xargs -n1 cargo install <"$d/cargo.txt" || true
     fi
     if [[ -s $d/uv-tools.txt ]] && have uv && ask "Installer les outils uv ?"; then
-        xargs -a "$d/uv-tools.txt" -n1 uv tool install || true
+        xargs -n1 uv tool install <"$d/uv-tools.txt" || true
     fi
     if [[ -s $d/npm-global.txt ]] && have npm && ask "Installer les paquets npm globaux ?"; then
-        xargs -a "$d/npm-global.txt" npm install -g || true
+        xargs npm install -g <"$d/npm-global.txt" || true
     fi
     if [[ -s $d/pip.txt ]] && have pip && ask "Installer les paquets pip (--user) ?"; then
-        xargs -a "$d/pip.txt" pip install --user || true
+        xargs pip install --user <"$d/pip.txt" || true
     fi
 }
 

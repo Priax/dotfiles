@@ -1,8 +1,9 @@
 # ~/chemin → home/chemin, /chemin → system/chemin (sudo), « / » final = dossier.
+# « # linux » ou « # macos » en fin de ligne: entrée ignorée sur l'autre OS.
 
-~/.bashrc
-~/.bash_profile
-~/.profile
+~/.bashrc                  # linux
+~/.bash_profile            # linux
+~/.profile                 # linux
 ~/.config/fish/
 
 ~/.gitconfig
@@ -16,13 +17,13 @@
 ~/.clang-format
 ~/.gdbinit
 
-~/.config/mimeapps.list
-~/.config/fcitx5/profile
-~/.config/fcitx5/config
+~/.config/mimeapps.list    # linux
+~/.config/fcitx5/profile   # linux
+~/.config/fcitx5/config    # linux
 
-/etc/docker/daemon.json
+/etc/docker/daemon.json  # linux
 
-/var/lib/pgsql/data/postgresql.conf
-/var/lib/pgsql/data/postgresql.auto.conf
-/var/lib/pgsql/data/pg_hba.conf
-/var/lib/pgsql/data/pg_ident.conf
+/var/lib/pgsql/data/postgresql.conf  # linux
+/var/lib/pgsql/data/postgresql.auto.conf  # linux
+/var/lib/pgsql/data/pg_hba.conf  # linux
+/var/lib/pgsql/data/pg_ident.conf  # linux
