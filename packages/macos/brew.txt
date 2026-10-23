@@ -2,9 +2,9 @@ bash
 ffmpeg
 fish
 git
+git-lfs
 go
 imagemagick
-luarocks
 neovim
 node
 ripgrep
