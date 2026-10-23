@@ -7,6 +7,11 @@ set -gx EDITOR nvim
 # Défini ici plutôt que dans fish_variables (état local, non versionné)
 set -g fish_greeting 'Stay silly !! <3'
 
+# macOS : Homebrew (absent sur Linux)
+if test -x /opt/homebrew/bin/brew
+    /opt/homebrew/bin/brew shellenv fish | source
+end
+
 fish_add_path -g ~/.local/bin ~/bin $BUN_INSTALL/bin $FLYCTL_INSTALL/bin ~/.ghcup/bin ~/.deno/bin ~/.cargo/bin
 fish_add_path -g -a /usr/local/go/bin $GOPATH/bin ~/.cabal/bin
 
