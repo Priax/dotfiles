@@ -111,8 +111,8 @@ save_one() {
         tmp="$(mktemp)"
         if read_file "$sys" >"$tmp"; then
             mv "$tmp" "$repo"
-            # stat -c (GNU) ou stat -f (BSD, macOS)
-            [[ -r $sys && -O $sys ]] && chmod "$(stat -c %a "$sys" 2>/dev/null || stat -f %Lp "$sys")" "$repo"
+            # stat -c (GNU) ou stat -f (BSD, macOS); -L: droits de la cible si $sys est un lien
+            [[ -r $sys && -O $sys ]] && chmod "$(stat -L -c %a "$sys" 2>/dev/null || stat -L -f %Lp "$sys")" "$repo"
         else
             rm -f "$tmp"
             warn "  illisible ou absent : $(pretty "$sys")"
@@ -132,7 +132,7 @@ dump() {
         warn "  échec, liste conservée : ${out#"$REPO_DIR"/}"
     elif [[ -s $tmp ]]; then
         mv "$tmp" "$out"
-        printf '  %s (%s)\n' "${out#"$REPO_DIR"/}" "$(wc -l <"$out")"
+        printf '  %s (%s)\n' "${out#"$REPO_DIR"/}" "$(wc -l <"$out" | tr -d ' ')"
     else
         rm -f "$tmp" "$out"
     fi
@@ -192,24 +192,28 @@ cmd_push() {
     cmd_save
     cd "$REPO_DIR"
     git add -A
-    if git diff --cached --quiet; then
+    if ! git diff --cached --quiet; then
+        check_secrets
+        git --no-pager diff --cached --stat
+        git commit -q -m "sync: $(hostname -s) $(date '+%Y-%m-%d %H:%M')" \
+            -m "$(git diff --cached --stat | tail -n 1)"
+    elif [[ -z $(git rev-list '@{u}..HEAD') ]]; then
         ok "Rien à commiter, les dotfiles sont à jour."
         return
+    else
+        info "Rien de nouveau, mais des commits pas encore poussés: envoi..."
     fi
-    check_secrets
-    git --no-pager diff --cached --stat
-    git commit -q -m "sync: $(hostname -s) $(date '+%Y-%m-%d %H:%M')" \
-        -m "$(git diff --cached --stat | tail -n 1)"
 
     # Rattrape ce que l'autre machine a poussé entre-temps, sans quoi le push serait refusé.
-    local upstream
-    upstream="$(git rev-parse '@{u}')"
+    local before after
+    before="$(git rev-parse '@{u}')"
     git pull -q --rebase ||
         die "conflit avec l'autre machine: corrige les fichiers (git status), puis « git rebase --continue », « git push » et « dot apply »"
+    after="$(git rev-parse '@{u}')"
     git push -q origin HEAD
     ok "Dotfiles commités et poussés."
     # Sinon le prochain push, fait depuis cette machine pas à jour, annulerait ces changements.
-    if [[ $(git rev-parse '@{u}~1') != "$upstream" ]]; then
+    if [[ $after != "$before" ]]; then
         info "Changements de l'autre machine récupérés, installation ici..."
         cmd_apply
     fi
@@ -288,7 +292,11 @@ cmd_apply() {
         chmod 700 "$HOME/.ssh"
         [[ -f $HOME/.ssh/config ]] && chmod 600 "$HOME/.ssh/config"
     fi
-    ok "Terminé. Pense à redémarrer docker/postgresql si leur config a changé."
+    if [[ $OS == linux ]]; then
+        ok "Terminé. Pense à redémarrer docker/postgresql si leur config a changé."
+    else
+        ok "Terminé."
+    fi
 }
 
 cmd_pull() {
