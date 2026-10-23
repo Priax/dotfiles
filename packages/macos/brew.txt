@@ -1,0 +1,12 @@
+bash
+ffmpeg
+fish
+git
+go
+imagemagick
+luarocks
+neovim
+node
+ripgrep
+rsync
+tree-sitter-cli
