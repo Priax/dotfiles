@@ -95,7 +95,8 @@ save_one() {
         tmp="$(mktemp)"
         if read_file "$sys" >"$tmp"; then
             mv "$tmp" "$repo"
-            [[ -r $sys && -O $sys ]] && chmod --reference="$sys" "$repo"
+            # stat -c (GNU) ou stat -f (BSD, macOS)
+            [[ -r $sys && -O $sys ]] && chmod "$(stat -c %a "$sys" 2>/dev/null || stat -f %Lp "$sys")" "$repo"
         else
             rm -f "$tmp"
             warn "  illisible ou absent : $(pretty "$sys")"
@@ -127,6 +128,8 @@ pkg_flatpak() { flatpak list --app --columns=application | sort -u; }
 pkg_cargo() { cargo install --list | awk '/^[^ ]/ {print $1}'; }
 pkg_uv() { uv tool list | awk '/^[^- ]/ {print $1}'; }
 pkg_pip() { pip list --user --not-required --format=freeze | cut -d= -f1; }
+pkg_brew() { brew leaves --installed-on-request; }
+pkg_brew_cask() { brew list --cask -1; }
 pkg_npm() {
     npm ls -g --depth=0 --parseable | tail -n +2 | sed 's|.*/node_modules/||' |
         { grep -vxE 'npm|corepack' || true; }
@@ -139,6 +142,8 @@ export_packages() {
     have dnf && dump "$d/dnf.txt" pkg_dnf
     have dnf && dump "$d/dnf-repos.txt" pkg_dnf_repos
     have flatpak && dump "$d/flatpak.txt" pkg_flatpak
+    have brew && dump "$d/brew.txt" pkg_brew
+    have brew && dump "$d/brew-cask.txt" pkg_brew_cask
     have cargo && dump "$d/cargo.txt" pkg_cargo
     have uv && dump "$d/uv-tools.txt" pkg_uv
     have pip && dump "$d/pip.txt" pkg_pip
@@ -315,6 +320,12 @@ install_packages() {
     fi
     if [[ -s $d/flatpak.txt ]] && have flatpak && ask "Installer les flatpaks ?"; then
         xargs -a "$d/flatpak.txt" flatpak install -y flathub
+    fi
+    if [[ -s $d/brew.txt ]] && have brew && ask "Installer les paquets brew ($(wc -l <"$d/brew.txt" | tr -d ' ')) ?"; then
+        xargs brew install <"$d/brew.txt" || true
+    fi
+    if [[ -s $d/brew-cask.txt ]] && have brew && ask "Installer les casks brew ?"; then
+        xargs brew install --cask <"$d/brew-cask.txt" || true
     fi
     if [[ -s $d/cargo.txt ]] && have cargo && ask "Installer les outils cargo ?"; then
         xargs -a "$d/cargo.txt" -n1 cargo install || true

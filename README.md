@@ -9,7 +9,7 @@ manifest     liste des fichiers suivis (une ligne = un fichier ou dossier/)
 dot          script de synchro
 home/        miroir de ~        (ex: home/.config/fish/config.fish)
 system/      miroir de /, sudo  (ex: system/etc/docker/daemon.json)
-packages/    listes dnf, flatpak, cargo, uv, npm, pip
+packages/    listes dnf, flatpak, brew, cargo, uv, npm, pip
 ```
 
 ## Utilisation
