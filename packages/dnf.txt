@@ -1,7 +1,6 @@
 aajohan-comfortaa-fonts
 abrt-cli
 abrt-desktop
-adoptium-temurin-java-repository
 akregator
 alsa-lib-devel
 alsa-sof-firmware
@@ -197,7 +196,6 @@ microcode_ctl
 minicom
 mpage
 mtr
-mullvad-vpn
 nasm
 neochat
 neovim
