@@ -12,3 +12,6 @@
 [mergetool]
 	keepBackup = false
 	prompt = false
+# Réglages propres à la machine (git-lfs…), non suivis par dotfiles. Absent = ignoré.
+[include]
+	path = ~/.gitconfig.local
