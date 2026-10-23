@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Installation sur une nouvelle machine :
+# Installation sur une nouvelle machine (Fedora ou macOS):
 #   curl -fsSL https://raw.githubusercontent.com/Priax/dotfiles/main/bootstrap.sh | bash
 # ou, si le repo est déjà cloné : ./bootstrap.sh
 
@@ -15,7 +15,28 @@ REPO_DIR="${DOTFILES_DIR:-$HOME/delivery/dotfiles}"
     exit 1
 }
 
-command -v git &>/dev/null || sudo dnf install -y git
+# Avec « curl | bash », stdin est le pipe: les questions doivent lire le terminal.
+if [[ $(uname -s) == Darwin ]]; then
+    # dot a besoin de bash 4+ et de rsync récent, que macOS ne fournit pas: Homebrew d'abord.
+    find_brew() {
+        local b
+        for b in /opt/homebrew/bin/brew /usr/local/bin/brew; do
+            if [[ -x $b ]]; then
+                echo "$b"
+                return
+            fi
+        done
+    }
+    brew_bin="$(find_brew)"
+    if [[ -z $brew_bin ]]; then
+        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" </dev/tty
+        brew_bin="$(find_brew)"
+    fi
+    eval "$("$brew_bin" shellenv)"
+    brew install git bash rsync </dev/tty
+else
+    command -v git &>/dev/null || sudo dnf install -y git
+fi
 
 if [[ ! -d $REPO_DIR/.git ]]; then
     mkdir -p "$(dirname "$REPO_DIR")"
@@ -23,5 +44,5 @@ if [[ ! -d $REPO_DIR/.git ]]; then
     git -C "$REPO_DIR" remote set-url --push origin git@github.com:Priax/dotfiles.git
 fi
 
-# Avec « curl | bash », stdin est le pipe : les questions doivent lire le terminal.
-exec "$REPO_DIR/dot" install </dev/tty
+# bash du PATH: celui de Homebrew sur Mac (le /bin/bash 3.2 de macOS ne suffit pas)
+exec bash "$REPO_DIR/dot" install </dev/tty

@@ -1,6 +1,6 @@
 # dotfiles
 
-Config perso (Fedora): bash, fish, git, nvim, kitty, docker, postgresql…
+Config perso (Fedora et macOS): bash, fish, git, nvim, kitty, docker, postgresql…
 
 ## Organisation
 
@@ -21,7 +21,7 @@ dot push       # machine → repo, commit, push
 dot pull       # git pull, repo → machine (l'existant est sauvegardé dans ~/dotfiles_backup/)
 ```
 
-Suivre un nouveau fichier : l'ajouter dans `manifest`, puis `dot push`.
+Suivre un nouveau fichier: l'ajouter dans `manifest`, puis `dot push`.
 Entrée propre à un OS: ajouter `# linux` ou `# macos` en fin de ligne dans `manifest`.
 
 ## Nouvelle machine
@@ -30,5 +30,11 @@ Entrée propre à un OS: ajouter `# linux` ou `# macos` en fin de ligne dans `ma
 curl -fsSL https://raw.githubusercontent.com/Priax/dotfiles/main/bootstrap.sh | bash
 ```
 
-Installe git, rsync, fish, nvim, kitty, ffmpeg, déploie les configs, propose
-d'installer les paquets et de passer à fish.
+Même commande sur Fedora et sur macOS. Installe git, rsync, fish, nvim, kitty et
+JetBrainsMono Nerd Font (sur Mac: Homebrew d'abord, puis bash et rsync récents),
+déploie les configs, propose d'installer les paquets de `packages/<os>/` et de
+passer à fish.
+
+À refaire à la main (non suivi, volontairement): les clés SSH (`~/.ssh`) et
+`~/.gitconfig.local` (réglages propres à la machine, ex: git-lfs sur le Mac).
+Puis, dans nvim: `:MasonInstallAll`.

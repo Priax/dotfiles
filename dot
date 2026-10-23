@@ -11,6 +11,12 @@
 
 set -euo pipefail
 
+# mapfile: bash 4+, alors que macOS fournit bash 3.2
+((BASH_VERSINFO[0] >= 4)) || {
+    echo "dot demande bash 4+ (sur Mac: brew install bash)" >&2
+    exit 1
+}
+
 REPO_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
 MANIFEST="$REPO_DIR/manifest"
 BACKUP_DIR="$HOME/dotfiles_backup/$(date +%Y%m%d_%H%M%S)"
@@ -362,10 +368,50 @@ install_packages() {
     fi
 }
 
+# Police de kitty.conf: pas de paquet Fedora, on prend la dernière release Nerd Fonts.
+install_nerd_font() {
+    # pas de « fc-list | grep -q »: avec pipefail, le SIGPIPE ferait échouer le test
+    [[ $(fc-list) == *"JetBrainsMono Nerd Font"* ]] && return
+    info "Installation de JetBrainsMono Nerd Font..."
+    local tmp dest="$HOME/.local/share/fonts/JetBrainsMonoNerdFont"
+    tmp="$(mktemp -d)"
+    if curl -fsSL -o "$tmp/font.tar.xz" \
+        https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.tar.xz; then
+        mkdir -p "$dest"
+        tar -xJf "$tmp/font.tar.xz" -C "$dest" --wildcards '*.ttf'
+        fc-cache -f "$dest" >/dev/null
+    else
+        warn "  téléchargement impossible, police à installer à la main"
+    fi
+    rm -rf "$tmp"
+}
+
+install_base() {
+    info "Installation des dépendances de base..."
+    if [[ $OS == macos ]]; then
+        have brew || die "Homebrew introuvable (bootstrap.sh l'installe)"
+        brew install git rsync bash fish neovim
+        brew install --cask kitty font-jetbrains-mono-nerd-font
+        # Homebrew dans le PATH de zsh, le shell de connexion par défaut de macOS
+        grep -qs 'brew shellenv' "$HOME/.zprofile" ||
+            echo "eval \"\$($(command -v brew) shellenv)\"" >>"$HOME/.zprofile"
+    else
+        sudo dnf install -y git rsync fish neovim kitty
+        install_nerd_font
+    fi
+}
+
+login_shell() {
+    if [[ $OS == macos ]]; then
+        dscl . -read "/Users/$USER" UserShell | awk '{print $2}'
+    else
+        getent passwd "$USER" | cut -d: -f7
+    fi
+}
+
 cmd_install() {
     [[ $(id -u) -eq 0 ]] && die "ne pas lancer en root"
-    info "Installation des dépendances de base..."
-    sudo dnf install -y git rsync fish neovim kitty
+    install_base
 
     cmd_apply
     install_packages
@@ -374,10 +420,19 @@ cmd_install() {
     ln -sf "$REPO_DIR/dot" "$HOME/.local/bin/dot"
     ok "Commande « dot » disponible dans ~/.local/bin"
 
-    if [[ $(getent passwd "$USER" | cut -d: -f7) != */fish ]] && ask "Passer à fish comme shell par défaut ?"; then
-        chsh -s "$(command -v fish)"
+    if [[ $(login_shell) != */fish ]] && ask "Passer à fish comme shell par défaut ?"; then
+        local fish
+        fish="$(command -v fish)"
+        # chsh refuse un shell absent de /etc/shells (cas du fish de Homebrew)
+        grep -qx "$fish" /etc/shells || echo "$fish" | sudo tee -a /etc/shells >/dev/null
+        chsh -s "$fish"
     fi
     ok "Installation terminée."
+    compgen -G "$HOME/.ssh/id_*" >/dev/null ||
+        info "Pas de clé SSH: copie ~/.ssh depuis l'ancienne machine, sinon « dot push » ne pourra pas pousser."
+    if [[ $OS == macos && ! -f $HOME/.gitconfig.local ]]; then
+        info "Pas de ~/.gitconfig.local: à recréer pour git-lfs (non suivi par dotfiles)."
+    fi
 }
 
 usage() {
