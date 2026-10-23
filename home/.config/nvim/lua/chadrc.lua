@@ -14,6 +14,30 @@ M.base46 = {
     -- },
 }
 
+-- installés par :MasonInstallAll (go requis pour gopls, goimports et delve)
+M.mason = {
+    pkgs = {
+        "astro-language-server",
+        "biome",
+        "clangd",
+        "clang-format",
+        "codelldb",
+        "css-lsp",
+        "delve",
+        "eslint-lsp",
+        "fourmolu",
+        "goimports",
+        "gopls",
+        "html-lsp",
+        "lua-language-server",
+        "mdx-analyzer",
+        "prettier",
+        "rust-analyzer",
+        "stylua",
+        "typescript-language-server",
+    },
+}
+
 -- M.nvdash = { load_on_startup = true }
 -- M.ui = {
 --       tabufline = {
