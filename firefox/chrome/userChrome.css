@@ -1,0 +1,95 @@
+#navigator-toolbox {
+  position: fixed !important;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10 !important;
+  border-bottom: none !important;
+  transform: translateY(calc(-100% + 3px));
+  opacity: 0;
+  transition:
+    transform 0.2s ease-in-out,
+    opacity 0.2s ease-in-out !important;
+}
+
+#navigator-toolbox:hover,
+#navigator-toolbox:focus-within,
+#navigator-toolbox:has([open], [panelopen]) {
+  transform: none;
+  opacity: 1;
+}
+
+#nav-bar {
+  padding-right: 130px !important;
+  border-top: none !important;
+  box-shadow: none !important;
+  -moz-window-dragging: drag !important;
+}
+
+#nav-bar :is(toolbarbutton, toolbaritem, #urlbar-container) {
+  -moz-window-dragging: no-drag !important;
+}
+
+#TabsToolbar {
+  position: absolute !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  right: 0 !important;
+  z-index: 2 !important;
+  height: auto !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  background: transparent !important;
+}
+
+#TabsToolbar .titlebar-buttonbox-container {
+  visibility: visible !important;
+  align-items: center !important;
+}
+
+#TabsToolbar
+  > :not(.titlebar-buttonbox-container):not(
+    :has(.titlebar-buttonbox-container)
+  ) {
+  display: none !important;
+}
+
+#TabsToolbar-customization-target,
+#TabsToolbar .titlebar-spacer {
+  visibility: collapse !important;
+}
+
+#navigator-toolbox:has(#PersonalToolbar:not([collapsed="true"])) #TabsToolbar {
+  bottom: auto !important;
+  height: 40px !important;
+}
+
+#sidebar-header {
+  display: none !important;
+}
+
+#urlbar-background {
+  border-radius: 999px !important;
+}
+
+#urlbar-container {
+  max-width: 600px !important;
+  margin-inline: auto !important;
+}
+
+#appcontent browser {
+  border-radius: 8px !important;
+  clip-path: inset(0 round 8px) !important;
+}
+
+#tabbrowser-tabbox {
+  margin: 6px !important;
+  border-radius: 8px !important;
+  overflow: hidden !important;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35) !important;
+}
+
+menupopup,
+panel {
+  --panel-border-radius: 10px !important;
+}

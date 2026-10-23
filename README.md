@@ -9,6 +9,7 @@ manifest     liste des fichiers suivis (une ligne = un fichier ou dossier/)
 dot          script de synchro
 home/        miroir de ~        (ex: home/.config/fish/config.fish)
 system/      miroir de /, sudo  (ex: system/etc/docker/daemon.json)
+firefox/     miroir du profil Firefox par défaut (ex: firefox/chrome/userChrome.css)
 packages/    listes de paquets par OS: linux/ (dnf, flatpak…), macos/ (brew…)
 ```
 
@@ -23,6 +24,7 @@ dot pull       # git pull, repo → machine (l'existant est sauvegardé dans ~/d
 
 Suivre un nouveau fichier: l'ajouter dans `manifest`, puis `dot push`.
 Entrée propre à un OS: ajouter `# linux` ou `# macos` en fin de ligne dans `manifest`.
+Fichier du profil Firefox: `firefox:chemin` (le dossier du profil est retrouvé via `profiles.ini`).
 
 ## Nouvelle machine
 

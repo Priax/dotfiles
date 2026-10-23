@@ -49,10 +49,40 @@ ask() {
     [[ $reply =~ ^[YyOo]$ ]]
 }
 
+# Profil Firefox utilisé par défaut, d'après profiles.ini: son nom est aléatoire
+# (ex: 6mjqrltg.default-release) et diffère d'une machine à l'autre.
+firefox_profile() {
+    local roots root ini path
+    if [[ $OS == macos ]]; then
+        roots=("$HOME/Library/Application Support/Firefox")
+    else
+        roots=("$HOME/.mozilla/firefox" "$HOME/.config/mozilla/firefox" "$HOME/.var/app/org.mozilla.firefox/.mozilla/firefox")
+    fi
+    for root in "${roots[@]}"; do
+        ini="$root/profiles.ini"
+        [[ -f $ini ]] || continue
+        # [Install…] Default=, le profil que cette installation ouvre réellement
+        path="$(awk -F= '/^\[/ {s = $0} s ~ /^\[Install/ && $1 == "Default" {print $2; exit}' "$ini")"
+        if [[ -z $path ]]; then
+            path="$(awk -F= '/^\[/ {s = $0; p = ""; d = 0}
+                s ~ /^\[Profile/ { if ($1 == "Path") p = $2; if ($1 == "Default" && $2 == 1) d = 1
+                                   if (p != "" && d) {print p; exit} }' "$ini")"
+        fi
+        [[ -z $path ]] && continue
+        [[ $path == /* ]] || path="$root/$path"
+        if [[ -d $path ]]; then
+            echo "$path"
+            return
+        fi
+    done
+    return 1
+}
+
 # Une ligne « chemin_machine<TAB>chemin_repo » par entrée du manifest.
 # Une entrée suivie de « # linux » ou « # macos » est ignorée sur l'autre OS.
+# « firefox:chemin » est relatif au profil Firefox par défaut (voir firefox_profile).
 entries() {
-    local line tag
+    local line tag ff="" ff_done=0
     while IFS= read -r line || [[ -n $line ]]; do
         tag=""
         [[ $line == *"#"* ]] && tag="$(sed 's/^[[:space:]]*//; s/[[:space:]]*$//' <<<"${line#*#}")"
@@ -63,7 +93,15 @@ entries() {
         case $line in
             "~/"*) printf '%s\t%s\n' "$HOME/${line#\~/}" "$REPO_DIR/home/${line#\~/}" ;;
             /*) printf '%s\t%s\n' "$line" "$REPO_DIR/system$line" ;;
-            *) warn "Entrée ignorée (doit commencer par ~/ ou /) : $line" ;;
+            firefox:*)
+                if ((!ff_done)); then
+                    ff_done=1
+                    ff="$(firefox_profile)" ||
+                        warn "Profil Firefox introuvable, entrées firefox: ignorées (lance Firefox une fois, ferme-le, puis « dot apply »)"
+                fi
+                [[ -n $ff ]] && printf '%s\t%s\n' "$ff/${line#firefox:}" "$REPO_DIR/firefox/${line#firefox:}"
+                ;;
+            *) warn "Entrée ignorée (doit commencer par ~/, / ou firefox:): $line" ;;
         esac
     done <"$MANIFEST"
 }
