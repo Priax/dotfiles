@@ -886,8 +886,11 @@ end
 vim.cmd "qa!"
 LUA
     # sans le détail de chaque tâche git de lazy (une dizaine de lignes par plugin, avec ou sans
-    # couleurs ANSI selon le terminal); les erreurs et les messages de ce script restent affichés
+    # couleurs ANSI selon le terminal); les erreurs et les messages de ce script restent affichés.
+    # image.nvim (chargé au démarrage) signale l'absence de terminal, sans conséquence en headless:
+    # message retiré ici plutôt qu'avec un cond dans la config, qui empêcherait lazy de le mettre à jour
     DOT_NVIM=$1 DOT_NVIM_LIST=${2:-} nvim --headless -c "luafile $script" 2>&1 |
+        sed 's/image\.nvim: cannot query terminal size (non-terminal environment?)//' |
         { grep -vE '(Running|Finished) task|Récupération du sous-module|Fetching submodule|HEAD est maintenant sur|HEAD is now at' || true; }
     ((PIPESTATUS[0] == 0)) || warn "  nvim: échec de l'entretien"
     rm -f "$script"
