@@ -165,17 +165,20 @@ save_one() {
 dump() {
     local out=$1
     shift
-    local tmp
+    local tmp err
     tmp="$(mktemp)"
-    if ! "$@" >"$tmp" 2>/dev/null; then
+    err="$(mktemp)"
+    if ! "$@" >"$tmp" 2>"$err"; then
         rm -f "$tmp"
-        warn "  échec, liste conservée : ${out#"$REPO_DIR"/}"
+        # dernière ligne d'erreur: la cause (pour Python, la ligne d'exception sous la trace)
+        warn "  échec, liste conservée : ${out#"$REPO_DIR"/} ($(grep . "$err" | tail -n 1))"
     elif [[ -s $tmp ]]; then
         mv "$tmp" "$out"
         printf '  %s (%s)\n' "${out#"$REPO_DIR"/}" "$(wc -l <"$out" | tr -d ' ')"
     else
         rm -f "$tmp" "$out"
     fi
+    rm -f "$err"
 }
 
 pkg_dnf() { dnf repoquery --userinstalled --leaves --qf '%{name}\n' | sort -u; }
