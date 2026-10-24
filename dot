@@ -415,7 +415,25 @@ cmd_apply() {
 }
 
 cmd_pull() {
+    # Fichiers du repo modifiés sans commit (dot save, ou dot push interrompu): git refuserait la
+    # fusion avec un message peu clair. Ce sont des changements de cette machine, jamais poussés.
+    local dirty
+    dirty="$(git -C "$REPO_DIR" status --porcelain)"
+    if [[ -n $dirty ]]; then
+        warn "Le repo contient des changements de cette machine qui n'ont pas été poussés :"
+        printf '%s\n' "$dirty" >&2
+        warn "Soit « dot push » pour les envoyer (fusionnés avec ceux de l'autre machine),"
+        warn "soit, pour les abandonner: git -C $(pretty "$REPO_DIR") checkout -- <fichier>"
+        exit 1
+    fi
     git -C "$REPO_DIR" pull --ff-only
+    # dot lui-même a pu changer: bash lit le script au fil de l'exécution et continuerait l'ancienne
+    # version (fichier remplacé par git). La suite est donc relancée avec la nouvelle.
+    exec "$REPO_DIR/dot" after-pull
+}
+
+# Suite de dot pull, avec la version de dot qui vient d'être tirée
+cmd_after_pull() {
     cmd_apply
     install_nerd_font
     # la config nvim tirée peut changer lazy-lock.json ou déclarer de nouveaux parsers / paquets Mason
@@ -789,10 +807,13 @@ local ok, err = xpcall(function()
         local spec = require("lazy.core.config").plugins["nvim-treesitter"]
         say "parsers treesitter manquants..."
         ts.install(require("lazy.core.plugin").values(spec, "opts", false).ensure_installed or {}):wait(900000)
+        io.stdout:write "\n" -- les messages de nvim-treesitter ne finissent pas par un retour à la ligne
         say "paquets Mason manquants..."
         local failed
         require("configs.mason").install_all(function(f)
             failed = f
+        end, function(name)
+            say("Mason: installation de " .. name)
         end)
         vim.wait(1800000, function()
             return failed ~= nil
@@ -1062,6 +1083,7 @@ case "${1:-}" in
     push) cmd_push ;;
     apply) cmd_apply ;;
     pull) cmd_pull ;;
+    after-pull) cmd_after_pull ;; # interne: fin de dot pull
     install) cmd_install ;;
     upgrade) cmd_upgrade ;;
     clean) cmd_clean ;;

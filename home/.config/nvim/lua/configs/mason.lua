@@ -12,8 +12,9 @@ function M.wanted()
     return require("nvchad.mason").get_pkgs()
 end
 
--- Installe ce qui manque. on_done(échecs) est appelé quand tout est fini (dot install, en headless)
-function M.install_all(on_done)
+-- Installe ce qui manque. on_start(nom) à chaque installation lancée, on_done(échecs) quand tout
+-- est fini (dot install et dot pull, en headless)
+function M.install_all(on_done, on_start)
     local wanted = M.wanted()
     local mr = require "mason-registry"
     mr.refresh(function()
@@ -29,6 +30,9 @@ function M.install_all(on_done)
             if not ok then
                 failed[#failed + 1] = name .. ": absent du registre Mason"
             elseif not pkg:is_installed() then
+                if on_start then
+                    on_start(name)
+                end
                 pending = pending + 1
                 pkg:install({ version = version ~= "" and version or nil }, function(success, err)
                     if not success then
