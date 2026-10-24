@@ -189,7 +189,11 @@ pkg_flatpak() { flatpak list --app --columns=application | sort -u; }
 # sans --no-default-features --features postgres.
 pkg_cargo() {
     local crates="${CARGO_HOME:-$HOME/.cargo}/.crates2.json"
-    [[ -f $crates ]] || return 0 # aucun « cargo install » sur cette machine
+    if [[ ! -s $crates ]]; then
+        # .crates2.json absent ou vide (vu sur le Mac): noms seuls, options d'installation inconnues
+        cargo install --list | awk '/^[^ ]/ {print $1}'
+        return
+    fi
     python3 -I - "$crates" <<'PY'
 import json, sys
 from urllib.parse import parse_qs, urlsplit
