@@ -185,7 +185,9 @@ pkg_flatpak() { flatpak list --app --columns=application | sort -u; }
 # .crates2.json. « cargo install --list » ne donne que le nom: sqlx-cli serait réinstallé
 # sans --no-default-features --features postgres.
 pkg_cargo() {
-    python3 -I - "${CARGO_HOME:-$HOME/.cargo}/.crates2.json" <<'PY'
+    local crates="${CARGO_HOME:-$HOME/.cargo}/.crates2.json"
+    [[ -f $crates ]] || return 0 # aucun « cargo install » sur cette machine
+    python3 -I - "$crates" <<'PY'
 import json, sys
 from urllib.parse import parse_qs, urlsplit
 
@@ -805,16 +807,22 @@ local ok, err = xpcall(function()
     local mr = mason_ready()
 
     if mode == "install" or mode == "upgrade" then
-        -- install ne télécharge que les parsers absents (= :TSInstallAll)
+        -- parsers d'ensure_installed absents (= :TSInstallAll); install() ajoute leurs dépendances
         local spec = require("lazy.core.config").plugins["nvim-treesitter"]
-        say "parsers treesitter manquants..."
-        ts.install(require("lazy.core.plugin").values(spec, "opts", false).ensure_installed or {}):wait(900000)
-        io.stdout:write "\n" -- les messages de nvim-treesitter ne finissent pas par un retour à la ligne
-        say "paquets Mason manquants..."
-        local failed
+        local installed = ts.get_installed()
+        local missing = vim.tbl_filter(function(lang)
+            return not vim.tbl_contains(installed, lang)
+        end, require("lazy.core.plugin").values(spec, "opts", false).ensure_installed or {})
+        if #missing > 0 then
+            say("parsers treesitter manquants: " .. table.concat(missing, ", "))
+            ts.install(missing):wait(900000)
+            io.stdout:write "\n" -- les messages de nvim-treesitter ne finissent pas par un retour à la ligne
+        end
+        local failed, started = nil, 0
         require("configs.mason").install_all(function(f)
             failed = f
         end, function(name)
+            started = started + 1
             say("Mason: installation de " .. name)
         end)
         vim.wait(1800000, function()
@@ -822,6 +830,9 @@ local ok, err = xpcall(function()
         end, 500)
         for _, line in ipairs(failed or {}) do
             say("échec Mason " .. line)
+        end
+        if #missing == 0 and started == 0 then
+            say "parsers et paquets Mason: rien ne manque"
         end
     end
     if mode == "upgrade" then
@@ -874,7 +885,11 @@ if not ok then
 end
 vim.cmd "qa!"
 LUA
-    DOT_NVIM=$1 DOT_NVIM_LIST=${2:-} nvim --headless -c "luafile $script" || warn "  nvim: échec de l'entretien"
+    # sans le détail de chaque tâche git de lazy (une dizaine de lignes par plugin, avec ou sans
+    # couleurs ANSI selon le terminal); les erreurs et les messages de ce script restent affichés
+    DOT_NVIM=$1 DOT_NVIM_LIST=${2:-} nvim --headless -c "luafile $script" 2>&1 |
+        { grep -vE '(Running|Finished) task|Récupération du sous-module|Fetching submodule|HEAD est maintenant sur|HEAD is now at' || true; }
+    ((PIPESTATUS[0] == 0)) || warn "  nvim: échec de l'entretien"
     rm -f "$script"
 }
 
