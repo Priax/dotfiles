@@ -1124,7 +1124,8 @@ cmd_clean() {
     fi
 
     info "Caches des outils de dev (re-téléchargés au besoin)..."
-    if npm="$(system_npm)" || npm="$(command -v npm)"; then "$npm" cache clean --force || true; fi
+    # --force obligatoire pour vider le cache, et npm avertit ensuite de son usage: erreurs seules
+    if npm="$(system_npm)" || npm="$(command -v npm)"; then "$npm" cache clean --force --loglevel=error || true; fi
     rm -rf "$HOME/.yarn/berry/cache"
     if have pip; then pip cache purge || true; fi
     if have go; then go clean -cache -testcache -modcache || true; fi
