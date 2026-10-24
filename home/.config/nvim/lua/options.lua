@@ -1,68 +1,32 @@
+-- Options par défaut de NvChad (:NvChadOptions pour voir le fichier à jour):
+-- laststatus=3, showmode=false, splitkeep=screen, clipboard=unnamedplus,
+-- cursorline + cursorlineopt=number, expandtab, smartindent, shiftwidth/tabstop/softtabstop=2,
+-- fillchars eob=" ", ignorecase + smartcase, mouse=a, number, numberwidth=2, ruler=false,
+-- shortmess+=sI, signcolumn=yes, splitbelow, splitright, timeoutlen=400, undofile,
+-- updatetime=250, whichwrap+=<>[]hl, providers node/python3/perl/ruby désactivés,
+-- mason/bin ajouté au PATH
 require "nvchad.options"
 
--- add yours here!
+vim.api.nvim_create_user_command("NvChadOptions", function()
+    vim.cmd.sview(vim.api.nvim_get_runtime_file("lua/nvchad/options.lua", false)[1])
+end, { desc = "Afficher les options par défaut de NvChad" })
+
 local opt = vim.opt
 local o = vim.o
-local g = vim.g
 
--- local o = vim.o
--- o.cursorlineopt ='both' -- to enable cursorline!
-
--------------------------------------- options ------------------------------------------
-o.laststatus = 3
-o.showmode = false
-
-o.clipboard = "unnamedplus"
-o.cursorline = true
-o.cursorlineopt = "number"
-
--- Indenting
-o.expandtab = true
+-- Indentation à 4 au lieu de 2
 o.shiftwidth = 4
-o.smartindent = true
 o.tabstop = 4
 o.softtabstop = 4
 
-opt.fillchars = { eob = " " }
-o.ignorecase = true
-o.smartcase = true
-o.mouse = "a"
-
--- Numbers
-o.number = true
-o.numberwidth = 2
-o.ruler = false
-
--- disable nvim intro
-opt.shortmess:append "sI"
-
-o.signcolumn = "yes"
-o.splitbelow = true
-o.splitright = true
-o.timeoutlen = 400
-o.undofile = true
-
--- interval for writing swap file to disk, also used by gitsigns
-o.updatetime = 250
-
--- go to previous/next line with h,l,left arrow and right arrow
--- when cursor reaches end/beginning of line
-opt.whichwrap:append "<>[]hl"
-
--- disable some default providers
-g.loaded_node_provider = 0
-g.loaded_python3_provider = 0
-g.loaded_perl_provider = 0
-g.loaded_ruby_provider = 0
-
--- line at column 70
-vim.opt.colorcolumn = "69"
+-- ligne affichée sur la colonne du dernier caractère voulu
+opt.colorcolumn = "69"
 
 -- show invisible caracters
 o.list = true
 opt.listchars = { tab = "» ", trail = "·", nbsp = "␣" }
 
--- .mdx (blog) : nvim ne connaît pas l'extension, coloration markdown
+-- .mdx (blog): nvim ne connaît pas l'extension, coloration markdown
 vim.filetype.add { extension = { mdx = "mdx" } }
 vim.treesitter.language.register("markdown", "mdx")
 

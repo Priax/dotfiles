@@ -2,7 +2,7 @@ local options = {
     formatters = {
         biome = {
             condition = function(_, ctx)
-                return vim.fs.find("biome.json", {
+                return vim.fs.find({ "biome.json", "biome.jsonc" }, {
                     upward = true,
                     path = ctx.filename,
                 })[1] ~= nil
@@ -22,7 +22,7 @@ local options = {
         c = { "clang-format" },
         cpp = { "clang-format" },
         haskell = { "fourmolu" },
-        go = { "goimports", "gofmt" },
+        go = { "goimports" }, -- goimports applique déjà gofmt
     },
 
     format_on_save = {

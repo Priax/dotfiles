@@ -89,6 +89,7 @@ gnupg2-g13
 gnupg2-utils
 gnupg2-wks
 godot
+golang
 google-noto-sans-cjk-fonts
 grub2-efi-ia32-cdboot
 grub2-efi-x64-cdboot

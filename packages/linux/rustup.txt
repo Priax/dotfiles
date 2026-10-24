@@ -1,0 +1,2 @@
+stable - cargo,clippy,rust-analyzer,rust-docs,rust-src,rustc,rustfmt wasm32-unknown-unknown
+nightly default cargo,clippy,llvm-tools,rust-analyzer,rust-docs,rust-src,rustc,rustfmt thumbv7em-none-eabihf,wasm32-unknown-unknown,x86_64-pc-windows-gnu

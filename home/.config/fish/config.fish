@@ -13,7 +13,7 @@ if test -x /opt/homebrew/bin/brew
 end
 
 fish_add_path -g ~/.local/bin ~/bin $BUN_INSTALL/bin $FLYCTL_INSTALL/bin ~/.ghcup/bin ~/.deno/bin ~/.cargo/bin
-fish_add_path -g -a /usr/local/go/bin $GOPATH/bin ~/.cabal/bin
+fish_add_path -g -a $GOPATH/bin ~/.cabal/bin
 
 if status is-interactive
     # Node version manager: falls back to system node when no version is selected

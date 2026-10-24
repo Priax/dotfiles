@@ -8,6 +8,8 @@
 #   dot apply     copie repo → machine (avec sauvegarde de l'existant)
 #   dot pull      git pull + apply
 #   dot install   nouvelle machine : dépendances + apply + paquets
+#   dot upgrade   met tout à jour: paquets, toolchains, outils, police, nvim
+#   dot clean     retire paquets inutilisés et caches (re-téléchargés au besoin)
 
 set -euo pipefail
 
@@ -179,14 +181,89 @@ dump() {
 pkg_dnf() { dnf repoquery --userinstalled --leaves --qf '%{name}\n' | sort -u; }
 pkg_dnf_repos() { dnf repolist --enabled | awk 'NR>1 {print $1}' | sort -u; }
 pkg_flatpak() { flatpak list --app --columns=application | sort -u; }
-pkg_cargo() { cargo install --list | awk '/^[^ ]/ {print $1}'; }
-pkg_uv() { uv tool list | awk '/^[^- ]/ {print $1}'; }
+# Une ligne par outil: les arguments de « cargo install » (source git, fonctionnalités), lus dans
+# .crates2.json. « cargo install --list » ne donne que le nom: sqlx-cli serait réinstallé
+# sans --no-default-features --features postgres.
+pkg_cargo() {
+    python3 -I - "${CARGO_HOME:-$HOME/.cargo}/.crates2.json" <<'PY'
+import json, sys
+from urllib.parse import parse_qs, urlsplit
+
+for key, info in sorted(json.load(open(sys.argv[1]))["installs"].items()):
+    name, _, source = key.split(" ", 2)
+    source = source.strip("()")
+    args = [name]
+    if source.startswith("path+"):
+        print(f"{name}: installé depuis un dossier local, pas suivi", file=sys.stderr)
+        continue
+    if source.startswith("git+"):
+        url = urlsplit(source[4:].split("#")[0])
+        args += ["--git", url._replace(query="").geturl()]
+        for ref, values in parse_qs(url.query).items():
+            if ref in ("branch", "tag", "rev"):
+                args += [f"--{ref}", values[0]]
+    if info.get("no_default_features"):
+        args.append("--no-default-features")
+    if info.get("all_features"):
+        args.append("--all-features")
+    if info.get("features"):
+        args += ["--features", ",".join(info["features"])]
+    print(" ".join(args))
+PY
+}
+
+# Réinstalle les outils d'une liste au format de pkg_cargo. cargo install ne recompile que
+# ceux qui manquent, ont une nouvelle version, ou d'autres options que celles demandées.
+install_cargo_tools() {
+    local line args
+    while read -r line; do
+        [[ -n $line ]] || continue
+        read -ra args <<<"$line"
+        cargo install "${args[@]}" || warn "  échec de ${args[0]}"
+    done <"$1"
+    return 0
+}
 pkg_pip() { pip list --user --not-required --format=freeze | cut -d= -f1; }
 pkg_brew() { brew leaves --installed-on-request; }
 pkg_brew_cask() { brew list --cask -1; }
+# Une ligne par toolchain: « nom default|- composants|- cibles », sans le triplet de l'hôte
+# (nightly-x86_64-unknown-linux-gnu → nightly) pour servir aussi sur l'autre OS
+pkg_rustup() {
+    local host def tc comps targets
+    host="$(rustup show | awk '/^Default host:/ {print $3}')"
+    def="$(rustup default | awk '{print $1}')"
+    rustup toolchain list | awk '{print $1}' | while read -r tc; do
+        # rust-std-<cible> correspond aux cibles, listées à part
+        comps="$(rustup component list --installed --toolchain "$tc" | grep -v '^rust-std-' | sed "s/-$host\$//" | paste -sd, -)"
+        targets="$(rustup target list --installed --toolchain "$tc" | { grep -vx "$host" || true; } | paste -sd, -)"
+        printf '%s %s %s %s\n' "${tc%-"$host"}" "$([[ $tc == "$def" ]] && echo default || echo -)" "${comps:--}" "${targets:--}"
+    done
+}
+
+# npm du système: les paquets globaux y sont installés, pas dans celui d'une version fnm
+system_npm() {
+    local n
+    for n in /usr/bin/npm /opt/homebrew/bin/npm /usr/local/bin/npm; do
+        if [[ -x $n ]]; then
+            echo "$n"
+            return
+        fi
+    done
+    return 1
+}
+# Nom seul (dernière version à l'installation), sauf pour une préversion (bêta, rc…): nom@version,
+# sinon une machine neuve installerait la dernière stable à la place (ex: ngrok 5 bêta → 4)
 pkg_npm() {
-    npm ls -g --depth=0 --parseable | tail -n +2 | sed 's|.*/node_modules/||' |
-        { grep -vxE 'npm|corepack' || true; }
+    local npm
+    npm="$(system_npm)" || return 1
+    "$npm" ls -g --depth=0 --json | python3 -I -c '
+import json, sys
+for name, info in sorted(json.load(sys.stdin).get("dependencies", {}).items()):
+    if name == "npm":
+        continue
+    version = info.get("version", "")
+    print(f"{name}@{version}" if "-" in version else name)
+'
 }
 
 export_packages() {
@@ -199,9 +276,9 @@ export_packages() {
     have brew && dump "$d/brew.txt" pkg_brew
     have brew && dump "$d/brew-cask.txt" pkg_brew_cask
     have cargo && dump "$d/cargo.txt" pkg_cargo
-    have uv && dump "$d/uv-tools.txt" pkg_uv
     have pip && dump "$d/pip.txt" pkg_pip
-    have npm && dump "$d/npm-global.txt" pkg_npm
+    have rustup && dump "$d/rustup.txt" pkg_rustup
+    system_npm >/dev/null && dump "$d/npm-global.txt" pkg_npm
     return 0
 }
 
@@ -340,6 +417,10 @@ cmd_apply() {
 cmd_pull() {
     git -C "$REPO_DIR" pull --ff-only
     cmd_apply
+    install_nerd_font
+    # la config nvim tirée peut changer lazy-lock.json ou déclarer de nouveaux parsers / paquets Mason
+    info "nvim (plugins, parsers et paquets Mason manquants)..."
+    nvim_maint install
 }
 
 
@@ -383,10 +464,14 @@ cmd_diff() {
 install_packages() {
     local d="$PKG_DIR"
     if [[ -s $d/dnf-repos.txt ]]; then
-        info "Dépôts utilisés sur l'ancienne machine (rpmfusion, docker-ce…) :"
+        info "Dépôts utilisés sur l'ancienne machine :"
         tr '\n' ' ' <"$d/dnf-repos.txt"
         echo
-        info "Les paquets venant de dépôts non configurés seront ignorés."
+        if ask "Ajouter ceux qu'on sait configurer (RPM Fusion, docker-ce, pgAdmin4) ?"; then
+            setup_dnf_repos "$d/dnf-repos.txt"
+        else
+            info "Les paquets venant de dépôts non configurés seront ignorés."
+        fi
     fi
     if [[ -s $d/dnf.txt ]] && ask "Installer les paquets dnf ($(wc -l <"$d/dnf.txt")) ?"; then
         xargs -a "$d/dnf.txt" sudo dnf install -y --skip-unavailable
@@ -401,31 +486,164 @@ install_packages() {
         xargs brew install --cask <"$d/brew-cask.txt" || true
     fi
     if [[ -s $d/cargo.txt ]] && have cargo && ask "Installer les outils cargo ?"; then
-        xargs -n1 cargo install <"$d/cargo.txt" || true
+        install_cargo_tools "$d/cargo.txt"
     fi
-    if [[ -s $d/uv-tools.txt ]] && have uv && ask "Installer les outils uv ?"; then
-        xargs -n1 uv tool install <"$d/uv-tools.txt" || true
-    fi
-    if [[ -s $d/npm-global.txt ]] && have npm && ask "Installer les paquets npm globaux ?"; then
-        xargs npm install -g <"$d/npm-global.txt" || true
+    local npm
+    if [[ -s $d/npm-global.txt ]] && npm="$(system_npm)" && ask "Installer les paquets npm globaux ?"; then
+        # préfixe global du npm système: /usr/local (root) sur Linux, Homebrew sur Mac
+        local sudo=()
+        [[ $OS == linux ]] && sudo=(sudo)
+        xargs "${sudo[@]}" "$npm" install -g <"$d/npm-global.txt" || true
+        # pnpm et yarn passent par les raccourcis de corepack
+        if grep -qx corepack "$d/npm-global.txt"; then
+            "${sudo[@]}" "$("$npm" prefix -g)/bin/corepack" enable || true
+        fi
     fi
     if [[ -s $d/pip.txt ]] && have pip && ask "Installer les paquets pip (--user) ?"; then
         xargs pip install --user <"$d/pip.txt" || true
     fi
 }
 
-# Police de kitty.conf: pas de paquet Fedora, on prend la dernière release Nerd Fonts.
+# Toolchains de rustup.txt (celui de cet OS, sinon celui de l'autre: noms sans l'hôte)
+install_rust_toolchains() {
+    local f="$PKG_DIR/rustup.txt" name def comps targets args
+    [[ -s $f ]] || f="$(find "$REPO_DIR/packages" -name rustup.txt | head -n 1)"
+    if [[ ! -s $f ]]; then
+        rustup toolchain install stable --component rust-analyzer && rustup default stable
+        return
+    fi
+    while read -r name def comps targets; do
+        args=()
+        [[ $comps != - ]] && args+=(--component "$comps")
+        [[ $targets != - ]] && args+=(--target "$targets")
+        rustup toolchain install "$name" "${args[@]}" || warn "  échec de la toolchain $name"
+        [[ $def == default ]] && rustup default "$name"
+    done <"$f"
+    return 0
+}
+
+# Outils installés par leur script officiel (curl | sh), dans ~: aucun gestionnaire de
+# paquets ne les connaît, donc absents des listes de packages/. Chemins dans config.fish / .bashrc.
+install_tools() {
+    info "Outils hors gestionnaire de paquets..."
+    if [[ ! -x $HOME/.cargo/bin/rustup ]] && ask "Installer Rust (rustup et les toolchains de rustup.txt) ?"; then
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs |
+            sh -s -- -y --no-modify-path --default-toolchain none || warn "  échec de rustup"
+        # pour la suite (toolchains, puis cargo.txt) dans ce même script
+        PATH="$HOME/.cargo/bin:$PATH"
+        have rustup && install_rust_toolchains
+    fi
+
+    if [[ ! -x $HOME/.ghcup/bin/ghcup ]] && ask "Installer Haskell (ghcup: GHC, cabal, stack, HLS) ?"; then
+        # dépendances listées par ghcup pour Fedora (sur Mac: outils Xcode, déjà là pour Homebrew)
+        [[ $OS == linux ]] &&
+            sudo dnf install -y gcc gcc-c++ gmp gmp-devel make ncurses ncurses-compat-libs xz perl
+        curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org |
+            BOOTSTRAP_HASKELL_NONINTERACTIVE=1 BOOTSTRAP_HASKELL_INSTALL_HLS=1 sh || warn "  échec de ghcup"
+    fi
+    if [[ -x $HOME/.ghcup/bin/ghcup ]]; then
+        PATH="$HOME/.ghcup/bin:$HOME/.cabal/bin:$PATH"
+        # formateur des .cabal utilisé par nvim (haskell-tools), compilé depuis les sources
+        if ! have cabal-fmt && ask "Compiler cabal-fmt (plusieurs minutes) ?"; then
+            { cabal update && cabal install cabal-fmt; } || warn "  échec de cabal-fmt"
+        fi
+    fi
+
+    if ! have fnm && ask "Installer fnm et la dernière LTS de Node ?"; then
+        if [[ $OS == macos ]]; then
+            brew install fnm
+        else
+            curl -fsSL https://fnm.vercel.app/install |
+                bash -s -- --install-dir "$HOME/.local/bin" --skip-shell || warn "  échec de fnm"
+            PATH="$HOME/.local/bin:$PATH"
+        fi
+        if have fnm; then
+            { fnm install --lts && fnm default lts-latest; } || warn "  échec de l'installation de Node"
+        fi
+    fi
+    if [[ ! -x $HOME/.deno/bin/deno ]] && ask "Installer Deno ?"; then
+        curl -fsSL https://deno.land/install.sh | sh -s -- -y --no-modify-path || warn "  échec de deno"
+    fi
+    if [[ ! -x $HOME/.fly/bin/flyctl ]] && ask "Installer flyctl ?"; then
+        curl -fsSL https://fly.io/install.sh | sh -s -- --non-interactive || warn "  échec de flyctl"
+    fi
+}
+
+# kitty: installeur officiel (dans ~/.local/kitty.app), plus à jour que le paquet Fedora.
+# Mise à jour: relancer l'installeur. Sur Mac, le cask Homebrew installe la même app officielle.
+install_kitty() {
+    local app="$HOME/.local/kitty.app" apps="$HOME/.local/share/applications"
+    [[ -x $app/bin/kitty ]] && return
+    info "Installation de kitty (installeur officiel)..."
+    curl -fsSL https://sw.kovidgoyal.net/kitty/installer.sh | sh /dev/stdin launch=n || {
+        warn "  échec de l'installeur kitty"
+        return
+    }
+    # intégration au bureau, comme indiqué dans la doc de kitty
+    mkdir -p "$HOME/.local/bin" "$apps"
+    ln -sf "$app/bin/kitty" "$app/bin/kitten" "$HOME/.local/bin/"
+    cp "$app/share/applications/kitty.desktop" "$app/share/applications/kitty-open.desktop" "$apps/"
+    sed -i "s|Icon=kitty|Icon=$app/share/icons/hicolor/256x256/apps/kitty.png|g; s|Exec=kitty|Exec=$app/bin/kitty|g" \
+        "$apps/kitty.desktop" "$apps/kitty-open.desktop"
+}
+
+# Dépôts tiers de dnf-repos.txt, avec la méthode d'installation de chacun (doc officielle)
+setup_dnf_repos() {
+    local list=$1 fedora
+    fedora="$(rpm -E %fedora)"
+    if grep -q '^rpmfusion-free' "$list"; then
+        sudo dnf install -y "https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$fedora.noarch.rpm" ||
+            warn "  échec de RPM Fusion free"
+    fi
+    if grep -q '^rpmfusion-nonfree' "$list"; then
+        sudo dnf install -y "https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$fedora.noarch.rpm" ||
+            warn "  échec de RPM Fusion nonfree"
+    fi
+    if grep -q '^docker-ce' "$list" && [[ ! -f /etc/yum.repos.d/docker-ce.repo ]]; then
+        sudo dnf config-manager addrepo --from-repofile=https://download.docker.com/linux/fedora/docker-ce.repo ||
+            warn "  échec du dépôt docker-ce"
+    fi
+    if grep -q '^pgAdmin4' "$list"; then
+        sudo dnf install -y https://ftp.postgresql.org/pub/pgadmin/pgadmin4/yum/pgadmin4-fedora-repo-2-1.noarch.rpm ||
+            warn "  échec du dépôt pgAdmin4"
+    fi
+    return 0
+}
+
+# Tag de la dernière release d'un repo GitHub (redirection de /releases/latest: pas de limite
+# de requêtes, contrairement à l'API GitHub). Vide si hors ligne ou si GitHub met plus de 15 s.
+github_latest() {
+    curl -fsSI --max-time 15 "https://github.com/$1/releases/latest" 2>/dev/null |
+        awk -F/ 'tolower($1) ~ /^location:/ {print $NF}' | tr -d '\r' || true
+}
+
+# Police de kitty.conf, sans paquet Fedora: installe ou met à jour JetBrainsMono Nerd Font
+# depuis la dernière release (version notée dans .version).
+# Sur Mac, c'est le cask Homebrew: « brew upgrade » s'en charge.
 install_nerd_font() {
-    # pas de « fc-list | grep -q »: avec pipefail, le SIGPIPE ferait échouer le test
-    [[ $(fc-list) == *"JetBrainsMono Nerd Font"* ]] && return
-    info "Installation de JetBrainsMono Nerd Font..."
-    local tmp dest="$HOME/.local/share/fonts/JetBrainsMonoNerdFont"
+    [[ $OS == linux ]] || return 0
+    local dest="$HOME/.local/share/fonts/JetBrainsMonoNerdFont" latest current tmp
+    latest="$(github_latest ryanoasis/nerd-fonts)"
+    current="$(cat "$dest/.version" 2>/dev/null || true)"
+    if [[ -z $latest ]]; then
+        [[ -n $current ]] && return 0
+        warn "  dernière version de JetBrainsMono Nerd Font introuvable (hors ligne ?)"
+        return 0
+    fi
+    [[ $current == "$latest" ]] && return 0
+    info "JetBrainsMono Nerd Font: ${current:-absente} → $latest..."
     tmp="$(mktemp -d)"
+    # décompressée à part: l'ancienne version n'est remplacée qu'une fois la nouvelle prête
+    mkdir -p "$tmp/font"
     if curl -fsSL -o "$tmp/font.tar.xz" \
-        https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.tar.xz; then
-        mkdir -p "$dest"
-        tar -xJf "$tmp/font.tar.xz" -C "$dest" --wildcards '*.ttf'
+        "https://github.com/ryanoasis/nerd-fonts/releases/download/$latest/JetBrainsMono.tar.xz" &&
+        tar -xJf "$tmp/font.tar.xz" -C "$tmp/font" --wildcards '*.ttf'; then
+        echo "$latest" >"$tmp/font/.version"
+        rm -rf "$dest"
+        mkdir -p "$(dirname "$dest")"
+        mv "$tmp/font" "$dest"
         fc-cache -f "$dest" >/dev/null
+        ok "  installée: relance kitty pour qu'il l'utilise (il ne recharge pas les polices à chaud)"
     else
         warn "  téléchargement impossible, police à installer à la main"
     fi
@@ -442,9 +660,355 @@ install_base() {
         grep -qs 'brew shellenv' "$HOME/.zprofile" ||
             echo "eval \"\$($(command -v brew) shellenv)\"" >>"$HOME/.zprofile"
     else
-        sudo dnf install -y git rsync fish neovim kitty
+        sudo dnf install -y git rsync fish neovim
+        install_kitty
         install_nerd_font
     fi
+    install_nvim_deps
+}
+
+# Ce dont la config nvim a besoin, installé explicitement: dans les listes de paquets,
+# ces outils peuvent n'apparaître que comme dépendance d'un autre (donc absents de dnf.txt).
+# À garder en phase avec lua/configs/health.lua de nvim (:checkhealth configs signale un oubli).
+#   go, npm, python3: compilent / installent les paquets Mason (:MasonInstallAll)
+#   tree-sitter + compilateur C: parsers de nvim-treesitter (branche main)
+#   ripgrep: Telescope live_grep    ImageMagick: image.nvim    ffmpeg: aperçu des vidéos
+install_nvim_deps() {
+    info "Dépendances de la config nvim..."
+    if [[ $OS == macos ]]; then
+        # compilateur C et python3: outils Xcode, installés avec Homebrew
+        brew install go node ripgrep tree-sitter-cli imagemagick ffmpeg
+    else
+        # Chemins plutôt que noms de paquets: dnf choisit le fournisseur (ffmpeg-free de Fedora,
+        # ou ffmpeg de RPM Fusion si le dépôt est configuré), le nom ne change pas d'une version à l'autre
+        sudo dnf install -y golang /usr/bin/npm /usr/bin/python3 /usr/bin/tree-sitter gcc make unzip \
+            /usr/bin/rg /usr/bin/magick /usr/bin/ffmpeg /usr/bin/ffprobe /usr/bin/wl-copy
+    fi
+}
+
+# Entretien de la config nvim en headless (DOT_NVIM):
+#   install  plugins aux versions de lazy-lock.json, parsers et paquets Mason manquants
+#            (dot install, dot pull: la config tirée peut en déclarer de nouveaux)
+#   upgrade  plugins (lazy sync), parsers et paquets Mason manquants, puis mise à jour de tous
+#   list     plugins retirés de la config (lazy clean, sûr: déduit du spec de lazy), puis écrit dans
+#            DOT_NVIM_LIST les parsers et paquets Mason que la config n'utilise plus, sans y toucher
+#   remove   désinstalle exactement ce que liste DOT_NVIM_LIST (après confirmation dans cmd_clean)
+nvim_maint() {
+    have nvim || return 0
+    local script
+    script="$(mktemp)"
+    cat >"$script" <<'LUA'
+local mode = vim.env.DOT_NVIM
+local function say(m)
+    io.stdout:write("  " .. m .. "\n")
+    io.stdout:flush()
+end
+
+local function mason_ready()
+    local mr = require "mason-registry"
+    local refreshed = false
+    mr.refresh(function()
+        refreshed = true
+    end)
+    vim.wait(120000, function()
+        return refreshed
+    end, 200)
+    return mr
+end
+
+-- parsers voulus: ensure_installed et leurs dépendances (javascript → ecma, jsx; html → html_tags…)
+local function wanted_parsers()
+    local spec = require("lazy.core.config").plugins["nvim-treesitter"]
+    local parsers, wanted = require "nvim-treesitter.parsers", {}
+    local function want(lang)
+        if wanted[lang] then
+            return
+        end
+        wanted[lang] = true
+        for _, dep in ipairs(parsers[lang] and parsers[lang].requires or {}) do
+            want(dep)
+        end
+    end
+    for _, lang in ipairs(require("lazy.core.plugin").values(spec, "opts", false).ensure_installed or {}) do
+        want(lang)
+    end
+    return wanted
+end
+
+-- paquets Mason voulus: ceux de :MasonInstallAll (configs/mason.lua: LSP activés, formatters, pkgs
+-- de chadrc), plus ceux que le registre associe à un LSP activé (si la table de noms en oublie)
+local function wanted_mason(mr)
+    local keep = {}
+    for _, name in ipairs(require("configs.mason").wanted()) do
+        keep[name:match "^[^@]+"] = true
+    end
+    local enabled = vim.lsp._enabled_configs or {}
+    for _, pkg in ipairs(mr.get_installed_packages()) do
+        local lsp = pkg.spec.neovim and pkg.spec.neovim.lspconfig
+        if lsp and enabled[lsp] then
+            keep[pkg.name] = true
+        end
+    end
+    return keep
+end
+
+local function run_all(jobs)
+    local pending = #jobs
+    for _, job in ipairs(jobs) do
+        job(function(success, err)
+            if not success then
+                say("échec: " .. tostring(err))
+            end
+            pending = pending - 1
+        end)
+    end
+    vim.wait(1800000, function()
+        return pending == 0
+    end, 500)
+end
+
+-- toujours quitter, même sur une erreur (sinon nvim headless reste ouvert)
+local ok, err = xpcall(function()
+    local lazy = require "lazy"
+    if mode == "install" then
+        say "plugins (lazy-lock.json)..."
+        lazy.restore { wait = true, show = false }
+    elseif mode == "upgrade" then
+        say "plugins (lazy sync)..."
+        lazy.sync { wait = true, show = false }
+    elseif mode == "list" then
+        say "plugins retirés de la config (lazy clean)..."
+        lazy.clean { wait = true, show = false }
+    end
+    lazy.load { plugins = { "nvim-lspconfig", "conform.nvim", "mason.nvim", "nvim-treesitter" } }
+    local ts = require "nvim-treesitter"
+    local mr = mason_ready()
+
+    if mode == "install" or mode == "upgrade" then
+        -- install ne télécharge que les parsers absents (= :TSInstallAll)
+        local spec = require("lazy.core.config").plugins["nvim-treesitter"]
+        say "parsers treesitter manquants..."
+        ts.install(require("lazy.core.plugin").values(spec, "opts", false).ensure_installed or {}):wait(900000)
+        say "paquets Mason manquants..."
+        local failed
+        require("configs.mason").install_all(function(f)
+            failed = f
+        end)
+        vim.wait(1800000, function()
+            return failed ~= nil
+        end, 500)
+        for _, line in ipairs(failed or {}) do
+            say("échec Mason " .. line)
+        end
+    end
+    if mode == "upgrade" then
+        say "mise à jour des parsers treesitter..."
+        ts.update():wait(600000)
+        local jobs = {}
+        for _, pkg in ipairs(mr.get_installed_packages()) do
+            local current, latest = pkg:get_installed_version(), pkg:get_latest_version()
+            if current ~= latest then
+                say(("Mason %s: %s → %s"):format(pkg.name, current or "?", latest))
+                jobs[#jobs + 1] = function(done)
+                    pkg:install({}, done)
+                end
+            end
+        end
+        run_all(jobs)
+    elseif mode == "list" then
+        local lines, parsers, keep = {}, wanted_parsers(), wanted_mason(mr)
+        for _, lang in ipairs(ts.get_installed()) do
+            if not parsers[lang] then
+                lines[#lines + 1] = "parser " .. lang
+            end
+        end
+        for _, pkg in ipairs(mr.get_installed_packages()) do
+            if not keep[pkg.name] then
+                lines[#lines + 1] = "mason " .. pkg.name
+            end
+        end
+        vim.fn.writefile(lines, vim.env.DOT_NVIM_LIST)
+    elseif mode == "remove" then
+        local langs, jobs = {}, {}
+        for _, line in ipairs(vim.fn.readfile(vim.env.DOT_NVIM_LIST)) do
+            local kind, name = line:match "^(%S+) (%S+)$"
+            if kind == "parser" then
+                langs[#langs + 1] = name
+            elseif kind == "mason" and mr.is_installed(name) then
+                jobs[#jobs + 1] = function(done)
+                    mr.get_package(name):uninstall({}, done)
+                end
+            end
+        end
+        if #langs > 0 then
+            ts.uninstall(langs):wait(60000)
+        end
+        run_all(jobs)
+    end
+end, debug.traceback)
+if not ok then
+    say("erreur: " .. err)
+end
+vim.cmd "qa!"
+LUA
+    DOT_NVIM=$1 DOT_NVIM_LIST=${2:-} nvim --headless -c "luafile $script" || warn "  nvim: échec de l'entretien"
+    rm -f "$script"
+}
+
+# kitty de l'installeur officiel: réinstallé seulement si une nouvelle version est sortie
+upgrade_kitty() {
+    local app="$HOME/.local/kitty.app" current latest
+    [[ -x $app/bin/kitty ]] || return 0
+    current="v$("$app/bin/kitty" --version | awk '{print $2}')"
+    latest="$(github_latest kovidgoyal/kitty)"
+    if [[ -n $latest && $current != "$latest" ]]; then
+        info "kitty: $current → $latest..."
+        curl -fsSL https://sw.kovidgoyal.net/kitty/installer.sh | sh /dev/stdin launch=n ||
+            warn "  échec de la mise à jour de kitty"
+    fi
+}
+
+# Paquets npm globaux à leur dernière version, sauf les préversions notées nom@version par
+# pkg_npm (gardées: « npm update -g » pourrait faire passer une bêta à la dernière stable)
+upgrade_npm() {
+    local npm sudo=() pkgs
+    npm="$(system_npm)" || return 0
+    [[ $OS == linux ]] && sudo=(sudo)
+    mapfile -t pkgs < <(pkg_npm | { grep -v '.@' || true; } | sed 's/$/@latest/')
+    ((${#pkgs[@]})) || return 0
+    info "Paquets npm globaux..."
+    "${sudo[@]}" "$npm" install -g "${pkgs[@]}" || warn "  échec de la mise à jour npm"
+}
+
+cmd_upgrade() {
+    info "Paquets système..."
+    if [[ $OS == macos ]]; then
+        { brew update && brew upgrade; } || warn "  échec de brew upgrade"
+    else
+        sudo dnf upgrade --refresh || warn "  dnf: mise à jour interrompue"
+        if have flatpak; then flatpak update -y || warn "  échec de flatpak update"; fi
+        upgrade_kitty
+    fi
+    install_nerd_font
+
+    if have rustup; then
+        info "Rust (toolchains, puis outils cargo)..."
+        rustup update || warn "  échec de rustup update"
+        if have cargo; then install_cargo_tools <(pkg_cargo); fi
+    fi
+    if have ghcup; then
+        info "Haskell (versions recommandées)..."
+        ghcup upgrade || warn "  échec de ghcup upgrade"
+        local tool
+        for tool in ghc hls cabal stack; do
+            ghcup install "$tool" recommended --set || warn "  échec de $tool"
+        done
+    fi
+    if have fnm; then
+        info "Node (dernière LTS via fnm)..."
+        { fnm install --lts && fnm default lts-latest; } || warn "  échec de fnm"
+    fi
+    upgrade_npm
+    if have deno; then deno upgrade || warn "  échec de deno upgrade"; fi
+    if have flyctl; then flyctl version upgrade || warn "  échec de flyctl"; fi
+
+    info "nvim (plugins, parsers, paquets Mason)..."
+    nvim_maint upgrade
+    ok "Terminé. lazy-lock.json a pu changer: « dot push » pour l'enregistrer."
+}
+
+# Versions de GHC présentes: celles de ghcup, et tout ghc / ghc-X.Y.Z du PATH (paquet dnf…)
+ghc_versions() {
+    local g
+    {
+        ls "$HOME/.ghcup/ghc" 2>/dev/null || true
+        for g in $(compgen -c | grep -E '^ghc(-[0-9.]+)?$' | sort -u); do
+            "$g" --numeric-version 2>/dev/null || true
+        done
+    } | sort -u
+}
+
+# Store de cabal: un dossier par version de GHC, inutile une fois ce GHC désinstallé
+clean_cabal_store() {
+    local dir version versions stale=()
+    versions="$(ghc_versions)"
+    for dir in "$HOME"/.cabal/store/ghc-* "$HOME"/.local/state/cabal/store/ghc-*; do
+        [[ -d $dir ]] || continue
+        version="${dir##*/ghc-}"
+        version="${version%%-*}"
+        grep -qx "$version" <<<"$versions" || stale+=("$dir")
+    done
+    ((${#stale[@]})) || return 0
+    info "  stores cabal de GHC qui ne sont plus installés:"
+    printf '    %s\n' "${stale[@]}"
+    if ask "  Les supprimer ?"; then rm -rf "${stale[@]}"; fi
+}
+
+free_kb() { df -Pk "$HOME" | awk 'NR == 2 {print $4}'; }
+
+# Principe: les caches (re-téléchargés au besoin) sont vidés sans demander; tout ce qui est
+# déduit (paquets « inutiles », parsers, paquets Mason, stores) est listé puis confirmé.
+cmd_clean() {
+    local before npm
+    before="$(free_kb)"
+    info "Paquets système inutilisés..."
+    if [[ $OS == macos ]]; then
+        local orphans
+        orphans="$(brew autoremove --dry-run 2>/dev/null || true)"
+        if [[ -n $orphans ]]; then
+            printf '%s\n' "$orphans"
+            if ask "Retirer ces paquets brew devenus inutiles ?"; then brew autoremove || true; fi
+        fi
+        brew cleanup --prune=all || true
+    else
+        # sans -y: dnf liste ce qu'il retire et demande confirmation
+        sudo dnf autoremove || true
+        sudo dnf clean all || true
+        if have flatpak; then flatpak uninstall --unused -y || true; fi
+        if ask "Ne garder que 2 semaines de journaux système ?"; then
+            sudo journalctl --vacuum-time=2weeks || true
+        fi
+        if have gio && ask "Vider la corbeille ?"; then gio trash --empty || true; fi
+        rm -rf "$HOME/.cache/thumbnails"
+    fi
+
+    info "Caches des outils de dev (re-téléchargés au besoin)..."
+    if npm="$(system_npm)" || npm="$(command -v npm)"; then "$npm" cache clean --force || true; fi
+    rm -rf "$HOME/.yarn/berry/cache"
+    if have pip; then pip cache purge || true; fi
+    if have go; then go clean -cache -testcache -modcache || true; fi
+    # crates téléchargées et leurs sources décompressées (l'index reste)
+    rm -rf "$HOME/.cargo/registry/cache" "$HOME/.cargo/registry/src" "$HOME/.cargo/git/checkouts"
+    if have ghcup; then
+        # pas --ghc-old: il retirerait des GHC marqués anciens qu'un projet utilise peut-être
+        ghcup gc --hls-no-ghc --cache --tmpdirs || true
+        clean_cabal_store
+    fi
+    if have docker && ask "Docker: supprimer conteneurs arrêtés, images et réseaux inutilisés ?"; then
+        docker system prune -f || true
+    fi
+    if have podman && ask "Podman: supprimer conteneurs arrêtés et images inutilisées ?"; then
+        podman system prune -f || true
+    fi
+
+    info "nvim (plugins, parsers et paquets Mason plus utilisés, miniatures, logs)..."
+    rm -rf "$HOME/.cache/nvim/video-thumbs"
+    local log list
+    for log in "$HOME"/.local/state/nvim/*.log; do
+        [[ -f $log ]] && : >"$log"
+    done
+    list="$(mktemp)"
+    nvim_maint list "$list"
+    if [[ -s $list ]]; then
+        info "  hors de la config nvim (installés à la main ?):"
+        sed 's/^/    /' "$list"
+        if ask "  Les désinstaller ?"; then nvim_maint remove "$list"; fi
+    fi
+    rm -f "$list"
+
+    local after
+    after="$(free_kb)"
+    ok "Terminé: $(((after - before) / 1024)) Mo libérés."
 }
 
 login_shell() {
@@ -460,7 +1024,12 @@ cmd_install() {
     install_base
 
     cmd_apply
+    # avant les paquets: cargo.txt a besoin du cargo de rustup
+    install_tools
     install_packages
+    # après les paquets: Mason compile avec go et npm (install_nvim_deps)
+    info "nvim (plugins, parsers, paquets Mason)..."
+    nvim_maint install
 
     mkdir -p "$HOME/.local/bin"
     ln -sf "$REPO_DIR/dot" "$HOME/.local/bin/dot"
@@ -482,7 +1051,7 @@ cmd_install() {
 }
 
 usage() {
-    sed -n '2,10s/^# \{0,1\}//p' "${BASH_SOURCE[0]}"
+    sed -n '2,12s/^# \{0,1\}//p' "${BASH_SOURCE[0]}"
     exit "${1:-0}"
 }
 
@@ -494,6 +1063,8 @@ case "${1:-}" in
     apply) cmd_apply ;;
     pull) cmd_pull ;;
     install) cmd_install ;;
+    upgrade) cmd_upgrade ;;
+    clean) cmd_clean ;;
     -h | --help | help) usage ;;
     *) usage 1 ;;
 esac

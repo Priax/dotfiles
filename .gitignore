@@ -16,4 +16,7 @@ id_*
 
 home/.ssh/
 home/.aws/
-home/.local/share/fonts/
+# polices: seules celles du manifest (la Nerd Font, 220 Mo, est téléchargée par dot)
+home/.local/share/fonts/*
+!home/.local/share/fonts/Daydream.ttf
+!home/.local/share/fonts/TexMaths-*.ttf

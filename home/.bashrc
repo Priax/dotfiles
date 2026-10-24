@@ -25,7 +25,6 @@ export BUN_INSTALL="$HOME/.bun"
 export FLYCTL_INSTALL="$HOME/.fly"
 export EDITOR=nvim
 
-path_append  /usr/local/go/bin
 path_append  "$GOPATH/bin"
 path_append  "$HOME/.cabal/bin"
 path_prepend "$HOME/.cargo/bin"

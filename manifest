@@ -17,6 +17,15 @@
 ~/.clang-format
 ~/.gdbinit
 
+# Polices perso (la Nerd Font est installée et mise à jour par dot, pas suivie ici)
+~/.local/share/fonts/Daydream.ttf           # linux
+~/.local/share/fonts/TexMaths-BB.ttf        # linux
+~/.local/share/fonts/TexMaths-Cal.ttf       # linux
+~/.local/share/fonts/TexMaths-Frak.ttf      # linux
+~/.local/share/fonts/TexMaths-Rm.ttf        # linux
+~/.local/share/fonts/TexMaths-Scr.ttf       # linux
+~/.local/share/fonts/TexMaths-Symbols.ttf   # linux
+
 ~/.config/mimeapps.list    # linux
 ~/.config/fcitx5/profile   # linux
 ~/.config/fcitx5/config    # linux

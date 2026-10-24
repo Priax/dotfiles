@@ -19,8 +19,23 @@ packages/    listes de paquets par OS: linux/ (dnf, flatpak…), macos/ (brew…
 dot status     # qu'est-ce qui a changé ?
 dot diff fish  # voir le détail (filtre optionnel)
 dot push       # machine → repo, commit, push
-dot pull       # git pull, repo → machine (l'existant est sauvegardé dans ~/dotfiles_backup/)
+dot pull       # git pull, repo → machine (l'existant est sauvegardé dans ~/dotfiles_backup/),
+               # puis plugins nvim (lazy-lock.json), parsers et paquets Mason manquants
+dot upgrade    # met tout à jour (voir plus bas)
+dot clean      # retire paquets inutilisés et caches (voir plus bas)
 ```
+
+`dot upgrade`: paquets système (dnf + flatpak, ou brew), kitty et JetBrainsMono Nerd Font
+si une nouvelle version est sortie, toolchains Rust et outils cargo, Haskell (versions
+recommandées par ghcup), dernière LTS de Node (fnm), paquets npm globaux, Deno, flyctl, et
+dans nvim: plugins (`lazy-lock.json` change: `dot push` ensuite), parsers treesitter, paquets Mason.
+
+`dot clean`: vide sans demander les caches, re-téléchargés au besoin (dnf/brew, npm, yarn, pip,
+go, cargo, ghcup, miniatures, logs de nvim). Tout ce qui est *déduit* est listé puis confirmé:
+paquets devenus inutiles (dnf/brew autoremove), store cabal des GHC désinstallés, parsers et
+paquets Mason hors de la config nvim (peut-être installés à la main), journaux système,
+corbeille, images Docker/Podman. Les plugins retirés de la config nvim partent sans demander
+(lazy le déduit de la config elle-même).
 
 Suivre un nouveau fichier: l'ajouter dans `manifest`, puis `dot push`.
 Entrée propre à un OS: ajouter `# linux` ou `# macos` en fin de ligne dans `manifest`.
@@ -37,6 +52,36 @@ JetBrainsMono Nerd Font (sur Mac: Homebrew d'abord, puis bash et rsync récents)
 déploie les configs, propose d'installer les paquets de `packages/<os>/` et de
 passer à fish.
 
-À refaire à la main (non suivi, volontairement): les clés SSH (`~/.ssh`) et
-`~/.gitconfig.local` (réglages propres à la machine, ex: git-lfs sur le Mac).
-Puis, dans nvim: `:MasonInstallAll`.
+Installe aussi:
+
+- les dépendances de la config nvim (go, npm, tree-sitter, ripgrep, ImageMagick, ffmpeg…);
+- par leur script officiel, ce qu'aucun gestionnaire de paquets ne suit: Rust (toutes les
+  toolchains de `rustup.txt`, avec composants et cibles), Haskell via ghcup (versions
+  recommandées du moment, + cabal-fmt en option), fnm (+ dernière LTS de Node), Deno,
+  flyctl, et kitty sur Linux;
+- les dépôts dnf tiers de `dnf-repos.txt` (RPM Fusion, docker-ce, pgAdmin4), avant les paquets;
+- les paquets npm globaux de `npm-global.txt` (npm du système, pas celui de fnm).
+
+JetBrainsMono Nerd Font: sur Linux, `dot install` et `dot pull` la mettent à jour quand une
+nouvelle version sort (version notée dans `~/.local/share/fonts/JetBrainsMonoNerdFont/.version`).
+Sur Mac, c'est un cask: `brew upgrade`.
+
+Et pour nvim, à la fin: les plugins (versions de `lazy-lock.json`), les parsers treesitter et les
+paquets Mason, que faisaient `:MasonInstallAll` et `:TSInstallAll`. Vérification dans nvim:
+`:checkhealth configs` (outils externes, paquets Mason, parsers).
+
+À refaire à la main (non suivi, volontairement): les clés SSH (`~/.ssh`), les clés GPG
+(`~/.gnupg`, à copier depuis l'ancienne machine ou via `gpg --export-secret-keys` / `gpg --import`)
+et `~/.gitconfig.local` (réglages propres à la machine, ex: git-lfs sur le Mac).
+
+## Applis à installer soi-même
+
+Ni paquet ni installeur scriptable, à récupérer sur leur site:
+
+- Aseprite
+- Soulseek
+- Anki
+- STM32CubeIDE
+- wrk
+- Vesktop (RPM de la release GitHub)
+- VirtualBox (dépôt Oracle)

@@ -9,7 +9,7 @@ create-tauri-app
 flamegraph
 itm
 microserver
-sqlx-cli
+sqlx-cli --no-default-features --features postgres
 tauri-cli
 trunk
 wasm-bindgen-cli

@@ -5,37 +5,33 @@ require "nvchad.mappings"
 local map = vim.keymap.set
 
 map("n", ";", ":", { desc = "CMD enter command mode" })
-map("i", "jk", "<ESC>")
+map("i", "jk", "<ESC>", { desc = "Quitter le mode insertion" })
 
--- I ADDED THIS
 map("n", "<leader>q", function()
     vim.diagnostic.setqflist()
     vim.cmd "copen"
 end, { desc = "Diagnostics to quickfix" })
 
 map("n", "<leader>o", function()
+    -- NvimTree, Telescope, terminal…: le nom du buffer n'est pas un fichier (ex: NvimTree_1)
     local file = vim.fn.expand "%:p"
-    if file ~= "" then
+    if vim.bo.filetype == "NvimTree" then
+        local node = require("nvim-tree.api").tree.get_node_under_cursor()
+        file = node and node.absolute_path or ""
+    elseif vim.bo.buftype ~= "" then
+        file = ""
+    end
+    if file ~= "" and vim.uv.fs_stat(file) then
         vim.ui.open(file)
-        print("Fichier ouvert: " .. file)
+        vim.notify("Fichier ouvert: " .. file)
     else
-        print "Aucun fichier à ouvrir"
+        vim.notify("Aucun fichier à ouvrir", vim.log.levels.WARN)
     end
 end, { desc = "Ouvrir le fichier avec l'application système" })
 
 map("n", "<leader>;", ";", { desc = "Repeat find forward" })
 
-map("n", "<leader>ca", vim.lsp.buf.code_action, { desc = "LSP Code Action" })
-
 -- debugger mappings
-map("n", "<leader>dd", function()
-    require("dap").run(require("dap").configurations.cpp[1])
-end, { desc = "Debug Launch (C/C++)" })
-
-map("n", "<leader>dR", function()
-    require("dap").run(require("dap").configurations.rust[1])
-end, { desc = "Debug Launch (Rust)" })
-
 map("n", "<leader>db", function()
     require("dap").toggle_breakpoint()
 end, { desc = "Toggle Breakpoint" })
@@ -49,12 +45,16 @@ map("n", "<leader>dr", function()
 end, { desc = "Open DAP REPL" })
 
 map("n", "<leader>dh", function()
+    -- sans session, le survol de nvim-dap ouvre une fenêtre vide « No active session »
+    if not require("dap").session() then
+        return vim.notify("Pas de session de debug active", vim.log.levels.WARN)
+    end
     require("dap.ui.widgets").hover()
 end, { desc = "Inspect Variable Under Cursor" })
 
 map("n", "<leader>dc", function()
     require("dap").continue()
-end, { desc = "Start/Continue Debugging" })
+end, { desc = "Start/Continue Debugging (choix de la config selon le filetype)" })
 
 map("n", "<leader>di", function()
     require("dap").step_into()

@@ -1,0 +1,8 @@
+@nestjs/cli
+corepack
+depcheck
+lighthouse
+ngrok@5.0.0-beta.2
+npm-check-updates
+pm2
+wrangler

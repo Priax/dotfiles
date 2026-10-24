@@ -5,7 +5,6 @@ return {
         opts = require "configs.conform",
     },
 
-    -- These are some examples, uncomment them if you want to see them work!
     {
         "neovim/nvim-lspconfig",
         config = function()
@@ -30,7 +29,7 @@ return {
             end
             opts.window.documentation.max_width = 80
 
-            -- .mdx : <Tab> / <S-Tab> parcourent les champs fantômes, <CR> écrit celui sélectionné
+            -- .mdx: <Tab> / <S-Tab> parcourent les champs fantômes, <CR> écrit celui sélectionné
             local cmp = require "cmp"
             local mdx_props = require "configs.mdx_props"
             local confirm = cmp.mapping.confirm { behavior = cmp.ConfirmBehavior.Insert, select = true }
@@ -63,7 +62,7 @@ return {
             end, { "i", "s" })
         end,
     },
-    -- .mdx / .md : pas de ' auto-fermant (apostrophes du français)
+    -- .mdx / .md: pas de ' auto-fermant (apostrophes du français)
     {
         "windwp/nvim-autopairs",
         config = function(_, opts)
@@ -82,6 +81,7 @@ return {
         "nvim-treesitter/nvim-treesitter",
         branch = "main",
         lazy = false,
+        -- branche main: ensure_installed n'est lu que par :TSInstallAll (à relancer après un ajout)
         opts = {
             ensure_installed = {
                 "vim",
@@ -107,11 +107,18 @@ return {
                 "gomod",
                 "gosum",
                 "gowork",
+                "bash",
+                "toml",
+                "regex",
+                "diff",
+                "gitcommit",
+                "query",
+                "jsdoc",
             },
         },
     },
 
-    -- 1. Aperçu Markdown dans le navigateur
+    -- Aperçu Markdown dans le navigateur
     {
         "brianhuster/live-preview.nvim",
         cmd = "LivePreview",
@@ -128,7 +135,7 @@ return {
         },
     },
 
-    -- 2. Image.nvim (Affichage des images dans le terminal)
+    -- Image.nvim (Affichage des images dans le terminal)
     {
         "3rd/image.nvim",
         lazy = false,
@@ -139,12 +146,13 @@ return {
                     clear_in_insert_mode = false,
                     download_remote_images = true,
                     only_render_image_at_cursor = false,
+                    filetypes = { "markdown", "vimwiki", "mdx" },
                 },
             },
         },
     },
 
-    -- 3. Gx.nvim (Ouvrir le lien ou fichier sous le curseur avec 'gx')
+    -- Gx.nvim (Ouvrir le lien ou fichier sous le curseur avec 'gx')
     {
         "chrishrb/gx.nvim",
         keys = { { "gx", "<cmd>Browse<cr>", mode = { "n", "x" } } },
@@ -181,18 +189,19 @@ return {
                         },
                     },
                     on_attach = function(_, bufnr, ht)
+                        -- <leader>H et pas <leader>h, déjà pris par le terminal horizontal de NvChad
                         local opts = { buffer = bufnr }
                         -- Hoogle search mot sous le curseur
-                        vim.keymap.set("n", "<leader>hs", ht.hoogle.hoogle_signature, opts)
+                        vim.keymap.set("n", "<leader>Hs", ht.hoogle.hoogle_signature, opts)
                         -- Évaluer le code inline (commentaires -- >>>)
-                        vim.keymap.set("n", "<leader>he", ht.lsp.buf_eval_all, opts)
+                        vim.keymap.set("n", "<leader>He", ht.lsp.buf_eval_all, opts)
                         -- Repl pour le fichier courant
-                        vim.keymap.set("n", "<leader>hr", ht.repl.toggle, opts)
+                        vim.keymap.set("n", "<leader>Hr", ht.repl.toggle, opts)
                         -- Repl pour le package
-                        vim.keymap.set("n", "<leader>hR", function()
+                        vim.keymap.set("n", "<leader>HR", function()
                             ht.repl.toggle(vim.api.nvim_buf_get_name(0))
                         end, opts)
-                        vim.keymap.set("n", "<leader>hq", ht.repl.quit, opts)
+                        vim.keymap.set("n", "<leader>Hq", ht.repl.quit, opts)
                     end,
                 },
                 tools = {
@@ -207,9 +216,7 @@ return {
         "leoluz/nvim-dap-go",
         ft = "go",
         dependencies = "mfussenegger/nvim-dap",
-        config = function(_, opts)
-            require("dap-go").setup(opts)
-        end,
+        opts = {},
     },
     {
         "esmuellert/codediff.nvim",
