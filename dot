@@ -913,8 +913,10 @@ upgrade_kitty() {
     fi
 }
 
-# Paquets npm globaux en retard (npm outdated) passés à leur dernière version, sauf les
-# préversions notées nom@version par pkg_npm (gardées: une bêta passerait à la dernière stable).
+# Paquets npm globaux en retard (npm outdated) passés à leur dernière version, sauf:
+# - les préversions notées nom@version par pkg_npm (une bêta passerait à la dernière stable);
+# - npm lui-même: sur Mac, il est rangé parmi les paquets globaux du Node de Homebrew, et se
+#   remplacerait dans des fichiers que brew gère. Il suit Node (brew upgrade, dnf upgrade).
 # Réinstaller tous les paquets à chaque fois prenait ~25 s même sans mise à jour.
 upgrade_npm() {
     local npm sudo=() pkgs
@@ -924,7 +926,7 @@ upgrade_npm() {
     # npm outdated sort avec le code 1 quand il trouve des paquets en retard
     mapfile -t pkgs < <({ "$npm" outdated -g --json 2>/dev/null || true; } | python3 -I -c '
 import json, sys
-pinned = set(sys.argv[1:])
+pinned = set(sys.argv[1:]) | {"npm"}
 for name, info in sorted(json.loads(sys.stdin.read() or "{}").items()):
     if name not in pinned and info.get("current") != info.get("latest"):
         print(f"{name}@latest")
