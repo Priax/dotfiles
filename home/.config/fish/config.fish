@@ -1,7 +1,6 @@
 # Environment (mirrors ~/.bashrc)
 set -gx GOPATH ~/go
 set -gx BUN_INSTALL ~/.bun
-set -gx FLYCTL_INSTALL ~/.fly
 set -gx EDITOR nvim
 
 # Défini ici plutôt que dans fish_variables (état local, non versionné)
@@ -12,7 +11,7 @@ if test -x /opt/homebrew/bin/brew
     /opt/homebrew/bin/brew shellenv fish | source
 end
 
-fish_add_path -g ~/.local/bin ~/bin $BUN_INSTALL/bin $FLYCTL_INSTALL/bin ~/.ghcup/bin ~/.deno/bin ~/.cargo/bin
+fish_add_path -g ~/.local/bin ~/bin $BUN_INSTALL/bin ~/.ghcup/bin ~/.deno/bin ~/.cargo/bin
 fish_add_path -g -a $GOPATH/bin ~/.cabal/bin
 
 if status is-interactive

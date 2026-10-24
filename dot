@@ -593,9 +593,6 @@ install_tools() {
     if [[ ! -x $HOME/.deno/bin/deno ]] && ask "Installer Deno ?"; then
         curl -fsSL https://deno.land/install.sh | sh -s -- -y --no-modify-path || warn "  échec de deno"
     fi
-    if [[ ! -x $HOME/.fly/bin/flyctl ]] && ask "Installer flyctl ?"; then
-        curl -fsSL https://fly.io/install.sh | sh -s -- --non-interactive || warn "  échec de flyctl"
-    fi
 }
 
 # kitty: installeur officiel (dans ~/.local/kitty.app), plus à jour que le paquet Fedora.
@@ -916,15 +913,26 @@ upgrade_kitty() {
     fi
 }
 
-# Paquets npm globaux à leur dernière version, sauf les préversions notées nom@version par
-# pkg_npm (gardées: « npm update -g » pourrait faire passer une bêta à la dernière stable)
+# Paquets npm globaux en retard (npm outdated) passés à leur dernière version, sauf les
+# préversions notées nom@version par pkg_npm (gardées: une bêta passerait à la dernière stable).
+# Réinstaller tous les paquets à chaque fois prenait ~25 s même sans mise à jour.
 upgrade_npm() {
     local npm sudo=() pkgs
     npm="$(system_npm)" || return 0
     [[ $OS == linux ]] && sudo=(sudo)
-    mapfile -t pkgs < <(pkg_npm | { grep -v '.@' || true; } | sed 's/$/@latest/')
-    ((${#pkgs[@]})) || return 0
     info "Paquets npm globaux..."
+    # npm outdated sort avec le code 1 quand il trouve des paquets en retard
+    mapfile -t pkgs < <({ "$npm" outdated -g --json 2>/dev/null || true; } | python3 -I -c '
+import json, sys
+pinned = set(sys.argv[1:])
+for name, info in sorted(json.loads(sys.stdin.read() or "{}").items()):
+    if name not in pinned and info.get("current") != info.get("latest"):
+        print(f"{name}@latest")
+' $(pkg_npm | { grep '.@' || true; } | sed 's/@[^@]*$//'))
+    if ((${#pkgs[@]} == 0)); then
+        info "  à jour"
+        return 0
+    fi
     "${sudo[@]}" "$npm" install -g "${pkgs[@]}" || warn "  échec de la mise à jour npm"
 }
 
@@ -947,22 +955,100 @@ cmd_upgrade() {
     if have ghcup; then
         info "Haskell (versions recommandées)..."
         ghcup upgrade || warn "  échec de ghcup upgrade"
+        # ghcup vient d'être mis à jour: sans ça, chaque commande suivante répète « New … version
+        # available » (versions plus récentes que les recommandées, volontairement pas suivies)
+        export GHCUP_SKIP_UPDATE_CHECK=1
         local tool
         for tool in ghc hls cabal stack; do
-            ghcup install "$tool" recommended --set || warn "  échec de $tool"
+            # la version recommandée déjà installée: juste l'activer (install afficherait un avertissement)
+            if ghcup list -t "$tool" -c installed -r 2>/dev/null | grep -qw recommended; then
+                ghcup set "$tool" recommended || warn "  échec de $tool"
+            else
+                ghcup install "$tool" recommended --set || warn "  échec de $tool"
+            fi
         done
     fi
     if have fnm; then
         info "Node (dernière LTS via fnm)..."
-        { fnm install --lts && fnm default lts-latest; } || warn "  échec de fnm"
+        # sans « fnm default »: le défaut choisi reste. S'il vaut lts-latest (machine installée par
+        # dot), il suit cet alias, que fnm install --lts déplace sur la nouvelle LTS.
+        local lts
+        lts="$(fnm ls-remote --lts --latest 2>/dev/null | awk '{print $1}')"
+        if [[ -n $lts ]] && fnm list | grep -qw "$lts"; then
+            info "  $lts, dernière LTS, déjà installée"
+        else
+            fnm install --lts || warn "  échec de fnm"
+        fi
     fi
     upgrade_npm
     if have deno; then deno upgrade || warn "  échec de deno upgrade"; fi
-    if have flyctl; then flyctl version upgrade || warn "  échec de flyctl"; fi
 
     info "nvim (plugins, parsers, paquets Mason)..."
     nvim_maint upgrade
     ok "Terminé. lazy-lock.json a pu changer: « dot push » pour l'enregistrer."
+}
+
+# Versions ghcup installées mais pas actives (« set »): les anciennes versions recommandées que
+# dot upgrade laisse derrière lui (2 à 3 Go par GHC ou HLS). Une question par version.
+clean_ghcup_inactive() {
+    local line tool version
+    # liste lue sur le descripteur 3: l'entrée standard reste aux questions
+    while read -r line <&3; do
+        read -r tool version _ <<<"$line"
+        [[ $tool == ghcup ]] && continue
+        if ask "  $tool $version installé mais pas actif, le supprimer ?"; then
+            ghcup rm "$tool" "$version" || warn "  échec de la suppression de $tool $version"
+        fi
+    done 3< <(comm -23 <(ghcup list -c installed -r 2>/dev/null | awk '{print $1, $2}' | sort) \
+        <(ghcup list -c set -r 2>/dev/null | awk '{print $1, $2}' | sort))
+    return 0
+}
+
+# Versions de Node voulues par les projets: .nvmrc / .node-version sous ~ (hors node_modules et
+# dossiers cachés). Une ligne par fichier: « version chemin » (version sans le « v »)
+node_version_files() {
+    local f
+    while read -r f; do
+        printf '%s %s\n' "$(tr -d '[:space:]v' <"$f")" "$f"
+    done < <(find "$HOME" -maxdepth 6 \( -name node_modules -o -name '.*' ! -name .nvmrc ! -name .node-version \) \
+        -prune -o \( -name .nvmrc -o -name .node-version \) -type f -print 2>/dev/null)
+}
+
+# Versions de Node de fnm qu'aucun alias (default, lts-latest…) ne désigne et qu'aucun projet ne
+# demande: pour chaque .nvmrc (« 22 », « 22.4 », « 22.4.1 »), la plus récente version installée
+# qui correspond est gardée. Une question par version restante.
+clean_fnm_versions() {
+    local dir version aliased installed wanted keep="" req path
+    aliased="$(for a in "$(fnm_dir)"/aliases/*; do readlink -f "$a"; done 2>/dev/null)"
+    installed="$(for dir in "$(fnm_dir)"/node-versions/v*/; do basename "$dir"; done | sed 's/^v//' | sort -V)"
+    while read -r req path; do
+        [[ $req =~ ^[0-9]+(\.[0-9]+)*$ ]] || continue # lts/iron, node…: alias fnm, pas une version
+        wanted="$(grep -E "^${req//./\\.}(\.|$)" <<<"$installed" | tail -n 1)"
+        [[ -n $wanted ]] && keep+="v$wanted $(pretty "$path")"$'\n'
+    done < <(node_version_files)
+    for dir in "$(fnm_dir)"/node-versions/v*/; do
+        version="$(basename "$dir")"
+        grep -qx "${dir%/}/installation" <<<"$aliased" && continue
+        if grep -q "^$version " <<<"$keep"; then
+            info "  Node $version gardée: demandée par $(grep "^$version " <<<"$keep" | head -n 1 | cut -d' ' -f2-)"
+            continue
+        fi
+        if ask "  Node $version (aucun alias fnm, aucun .nvmrc), la supprimer ?"; then
+            fnm uninstall "$version" || warn "  échec de la suppression de Node $version"
+        fi
+    done
+    return 0
+}
+
+# Dossier de fnm: FNM_DIR, sinon l'emplacement par défaut de chaque OS
+fnm_dir() {
+    if [[ -n ${FNM_DIR:-} ]]; then
+        echo "$FNM_DIR"
+    elif [[ $OS == macos ]]; then
+        echo "$HOME/Library/Application Support/fnm"
+    else
+        echo "${XDG_DATA_HOME:-$HOME/.local/share}/fnm"
+    fi
 }
 
 # Versions de GHC présentes: celles de ghcup, et tout ghc / ghc-X.Y.Z du PATH (paquet dnf…)
@@ -992,6 +1078,21 @@ clean_cabal_store() {
     if ask "  Les supprimer ?"; then rm -rf "${stale[@]}"; fi
 }
 
+# Corbeille (spec freedesktop, ~/.local/share/Trash): question seulement si elle n'est pas vide.
+# ktrash6 (KDE) vide aussi celles des autres disques; gio trash a besoin de gvfs (GNOME).
+empty_trash() {
+    local trash="${XDG_DATA_HOME:-$HOME/.local/share}/Trash"
+    [[ -n $(ls -A "$trash/files" 2>/dev/null) ]] || return 0
+    ask "Vider la corbeille ($(du -sh "$trash" | cut -f1)) ?" || return 0
+    if have ktrash6; then
+        ktrash6 --empty
+    elif have gio && gio trash --empty 2>/dev/null; then
+        :
+    else
+        rm -rf "${trash:?}/files" "$trash/info" "$trash/expunged" "$trash/directorysizes"
+    fi
+}
+
 free_kb() { df -Pk "$HOME" | awk 'NR == 2 {print $4}'; }
 
 # Principe: les caches (re-téléchargés au besoin) sont vidés sans demander; tout ce qui est
@@ -1016,7 +1117,7 @@ cmd_clean() {
         if ask "Ne garder que 2 semaines de journaux système ?"; then
             sudo journalctl --vacuum-time=2weeks || true
         fi
-        if have gio && ask "Vider la corbeille ?"; then gio trash --empty || true; fi
+        empty_trash
         rm -rf "$HOME/.cache/thumbnails"
     fi
 
@@ -1028,10 +1129,14 @@ cmd_clean() {
     # crates téléchargées et leurs sources décompressées (l'index reste)
     rm -rf "$HOME/.cargo/registry/cache" "$HOME/.cargo/registry/src" "$HOME/.cargo/git/checkouts"
     if have ghcup; then
+        # dot upgrade s'occupe des versions: pas de rappel « New … version available »
+        export GHCUP_SKIP_UPDATE_CHECK=1
         # pas --ghc-old: il retirerait des GHC marqués anciens qu'un projet utilise peut-être
         ghcup gc --hls-no-ghc --cache --tmpdirs || true
+        clean_ghcup_inactive
         clean_cabal_store
     fi
+    if have fnm; then clean_fnm_versions; fi
     if have docker && ask "Docker: supprimer conteneurs arrêtés, images et réseaux inutilisés ?"; then
         docker system prune -f || true
     fi
@@ -1103,17 +1208,23 @@ usage() {
     exit "${1:-0}"
 }
 
-case "${1:-}" in
-    status | st) cmd_status ;;
-    diff) cmd_diff "${2:-}" ;;
-    save) cmd_save ;;
-    push) cmd_push ;;
-    apply) cmd_apply ;;
-    pull) cmd_pull ;;
-    after-pull) cmd_after_pull ;; # interne: fin de dot pull
-    install) cmd_install ;;
-    upgrade) cmd_upgrade ;;
-    clean) cmd_clean ;;
-    -h | --help | help) usage ;;
-    *) usage 1 ;;
-esac
+main() {
+    case "${1:-}" in
+        status | st) cmd_status ;;
+        diff) cmd_diff "${2:-}" ;;
+        save) cmd_save ;;
+        push) cmd_push ;;
+        apply) cmd_apply ;;
+        pull) cmd_pull ;;
+        after-pull) cmd_after_pull ;; # interne: fin de dot pull
+        install) cmd_install ;;
+        upgrade) cmd_upgrade ;;
+        clean) cmd_clean ;;
+        -h | --help | help) usage ;;
+        *) usage 1 ;;
+    esac
+}
+
+# Sur une seule ligne, en fin de fichier: bash a déjà tout lu avant d'exécuter main, et exit
+# l'empêche de lire la suite. Modifier dot (dot pull, éditeur) pendant qu'il tourne est sans effet.
+main "$@"; exit

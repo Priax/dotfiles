@@ -22,7 +22,6 @@ path_append() {
 # User specific environment
 export GOPATH="$HOME/go"
 export BUN_INSTALL="$HOME/.bun"
-export FLYCTL_INSTALL="$HOME/.fly"
 export EDITOR=nvim
 
 path_append  "$GOPATH/bin"
@@ -30,7 +29,6 @@ path_append  "$HOME/.cabal/bin"
 path_prepend "$HOME/.cargo/bin"
 path_prepend "$HOME/.deno/bin"
 path_prepend "$HOME/.ghcup/bin"
-path_prepend "$FLYCTL_INSTALL/bin"
 path_prepend "$BUN_INSTALL/bin"
 path_prepend "$HOME/bin"
 path_prepend "$HOME/.local/bin"

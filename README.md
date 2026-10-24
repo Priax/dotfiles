@@ -27,13 +27,14 @@ dot clean      # retire paquets inutilisés et caches (voir plus bas)
 
 `dot upgrade`: paquets système (dnf + flatpak, ou brew), kitty et JetBrainsMono Nerd Font
 si une nouvelle version est sortie, toolchains Rust et outils cargo, Haskell (versions
-recommandées par ghcup), dernière LTS de Node (fnm), paquets npm globaux, Deno, flyctl, et
+recommandées par ghcup), dernière LTS de Node (fnm), paquets npm globaux, Deno, et
 dans nvim: plugins (`lazy-lock.json` change: `dot push` ensuite), parsers treesitter, paquets Mason.
 
 `dot clean`: vide sans demander les caches, re-téléchargés au besoin (dnf/brew, npm, yarn, pip,
 go, cargo, ghcup, miniatures, logs de nvim). Tout ce qui est *déduit* est listé puis confirmé:
 paquets devenus inutiles (dnf/brew autoremove), store cabal des GHC désinstallés, parsers et
-paquets Mason hors de la config nvim (peut-être installés à la main), journaux système,
+paquets Mason hors de la config nvim (peut-être installés à la main), versions inactives de
+GHC/HLS/cabal/stack (laissées par `dot upgrade`), versions de Node sans alias fnm, journaux système,
 corbeille, images Docker/Podman. Les plugins retirés de la config nvim partent sans demander
 (lazy le déduit de la config elle-même).
 
@@ -58,7 +59,7 @@ Installe aussi:
 - par leur script officiel, ce qu'aucun gestionnaire de paquets ne suit: Rust (toutes les
   toolchains de `rustup.txt`, avec composants et cibles), Haskell via ghcup (versions
   recommandées du moment, + cabal-fmt en option), fnm (+ dernière LTS de Node), Deno,
-  flyctl, et kitty sur Linux;
+  et kitty sur Linux;
 - les dépôts dnf tiers de `dnf-repos.txt` (RPM Fusion, docker-ce, pgAdmin4), avant les paquets;
 - les paquets npm globaux de `npm-global.txt` (npm du système, pas celui de fnm).
 
