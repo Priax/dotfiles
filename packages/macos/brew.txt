@@ -1,6 +1,7 @@
 bash
 ffmpeg
 fish
+fnm
 git
 git-lfs
 go

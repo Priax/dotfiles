@@ -1,0 +1,1 @@
+stable default cargo,clippy,rust-analyzer,rust-docs,rust-src,rustc,rustfmt -
