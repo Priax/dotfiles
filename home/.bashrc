@@ -19,6 +19,11 @@ path_append() {
     esac
 }
 
+# macOS: Homebrew (absent sur Linux)
+if [ -x /opt/homebrew/bin/brew ]; then
+    eval "$(/opt/homebrew/bin/brew shellenv)"
+fi
+
 # User specific environment
 export GOPATH="$HOME/go"
 export BUN_INSTALL="$HOME/.bun"
@@ -55,7 +60,15 @@ fi
 
 alias neofetch=fastfetch
 
+# macOS (launchd) et les bureaux Linux fournissent déjà un agent. Sinon (tty, ssh): un seul
+# agent partagé par tous les shells, sur un socket fixe, au lieu d'un nouveau par shell.
 if [ -z "$SSH_AUTH_SOCK" ]; then
-   eval "$(ssh-agent -s)" > /dev/null
-   ssh-add ~/.ssh/tsinghua_gitlab 2>/dev/null
+    export SSH_AUTH_SOCK="$HOME/.ssh/agent.sock"
+    ssh-add -l >/dev/null 2>&1
+    # 2: aucun agent derrière le socket
+    if [ $? -eq 2 ]; then
+        rm -f "$SSH_AUTH_SOCK"
+        ssh-agent -a "$SSH_AUTH_SOCK" >/dev/null
+        [ -f ~/.ssh/tsinghua_gitlab ] && ssh-add ~/.ssh/tsinghua_gitlab 2>/dev/null
+    fi
 fi

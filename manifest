@@ -1,13 +1,18 @@
 # ~/chemin → home/chemin, /chemin → system/chemin (sudo), « / » final = dossier.
 # « # linux » ou « # macos » en fin de ligne: entrée ignorée sur l'autre OS.
+# « destination < source »: même fichier du repo, posé ailleurs sur cette machine.
 
-~/.bashrc                  # linux
-~/.bash_profile            # linux
-~/.profile                 # linux
+~/.bashrc
+~/.bash_profile
+~/.profile
+~/.zprofile                # macos
+~/.zshenv                  # macos
 ~/.config/fish/
 
 ~/.gitconfig
 ~/.config/git/ignore
+# inclus par ~/.ssh/config (non suivi), voir ensure_ssh_include dans dot
+~/.config/ssh/common.conf
 
 ~/.config/nvim/
 ~/.config/kitty/kitty.conf
@@ -25,6 +30,13 @@
 ~/.local/share/fonts/TexMaths-Rm.ttf        # linux
 ~/.local/share/fonts/TexMaths-Scr.ttf       # linux
 ~/.local/share/fonts/TexMaths-Symbols.ttf   # linux
+~/Library/Fonts/Daydream.ttf          < ~/.local/share/fonts/Daydream.ttf          # macos
+~/Library/Fonts/TexMaths-BB.ttf       < ~/.local/share/fonts/TexMaths-BB.ttf       # macos
+~/Library/Fonts/TexMaths-Cal.ttf      < ~/.local/share/fonts/TexMaths-Cal.ttf      # macos
+~/Library/Fonts/TexMaths-Frak.ttf     < ~/.local/share/fonts/TexMaths-Frak.ttf     # macos
+~/Library/Fonts/TexMaths-Rm.ttf       < ~/.local/share/fonts/TexMaths-Rm.ttf       # macos
+~/Library/Fonts/TexMaths-Scr.ttf      < ~/.local/share/fonts/TexMaths-Scr.ttf      # macos
+~/Library/Fonts/TexMaths-Symbols.ttf  < ~/.local/share/fonts/TexMaths-Symbols.ttf  # macos
 
 ~/.config/mimeapps.list    # linux
 ~/.config/fcitx5/profile   # linux

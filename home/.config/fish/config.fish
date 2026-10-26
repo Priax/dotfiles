@@ -22,8 +22,16 @@ if status is-interactive
 
     alias neofetch=fastfetch
 
+    # macOS (launchd) et les bureaux Linux fournissent déjà un agent. Sinon (tty, ssh): un seul
+    # agent partagé par tous les shells, sur un socket fixe, au lieu d'un nouveau par shell.
     if not set -q SSH_AUTH_SOCK
-        eval (ssh-agent -c) >/dev/null
-        ssh-add ~/.ssh/tsinghua_gitlab 2>/dev/null
+        set -gx SSH_AUTH_SOCK ~/.ssh/agent.sock
+        ssh-add -l >/dev/null 2>&1
+        # 2: aucun agent derrière le socket
+        if test $status -eq 2
+            rm -f $SSH_AUTH_SOCK
+            ssh-agent -a $SSH_AUTH_SOCK >/dev/null
+            test -f ~/.ssh/tsinghua_gitlab; and ssh-add ~/.ssh/tsinghua_gitlab 2>/dev/null
+        end
     end
 end

@@ -23,6 +23,7 @@ dot pull       # git pull, repo → machine (l'existant est sauvegardé dans ~/d
                # puis plugins nvim (lazy-lock.json), parsers et paquets Mason manquants
 dot upgrade    # met tout à jour (voir plus bas)
 dot clean      # retire paquets inutilisés et caches (voir plus bas)
+dot defaults   # macOS: réglages système (packages/macos/defaults.sh), aussi lancé par dot install
 ```
 
 `dot upgrade`: paquets système (dnf + flatpak, ou brew), kitty et JetBrainsMono Nerd Font
@@ -40,6 +41,8 @@ corbeille, images Docker/Podman. Les plugins retirés de la config nvim partent 
 
 Suivre un nouveau fichier: l'ajouter dans `manifest`, puis `dot push`.
 Entrée propre à un OS: ajouter `# linux` ou `# macos` en fin de ligne dans `manifest`.
+Même fichier du repo à un autre emplacement selon l'OS: `destination < source`
+(ex: `~/Library/Fonts/Daydream.ttf < ~/.local/share/fonts/Daydream.ttf  # macos`).
 Fichier du profil Firefox: `firefox:chemin` (le dossier du profil est retrouvé via `profiles.ini`).
 
 ## Nouvelle machine
@@ -71,7 +74,9 @@ Et pour nvim, à la fin: les plugins (versions de `lazy-lock.json`), les parsers
 paquets Mason, que faisaient `:MasonInstallAll` et `:TSInstallAll`. Vérification dans nvim:
 `:checkhealth configs` (outils externes, paquets Mason, parsers).
 
-À refaire à la main (non suivi, volontairement): les clés SSH (`~/.ssh`), les clés GPG
+À refaire à la main (non suivi, volontairement): les clés SSH et les blocs `Host` de `~/.ssh/config`
+(les réglages communs, eux, sont dans `~/.config/ssh/common.conf`, que `dot apply` inclut en tête de
+`~/.ssh/config`), les clés GPG
 (`~/.gnupg`, à copier depuis l'ancienne machine ou via `gpg --export-secret-keys` / `gpg --import`)
 et `~/.gitconfig.local` (réglages propres à la machine, ex: git-lfs sur le Mac).
 

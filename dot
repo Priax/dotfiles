@@ -10,6 +10,7 @@
 #   dot install   nouvelle machine : dépendances + apply + paquets
 #   dot upgrade   met tout à jour: paquets, toolchains, outils, police, nvim
 #   dot clean     retire paquets inutilisés et caches (re-téléchargés au besoin)
+#   dot defaults  macOS: applique les réglages système de packages/macos/defaults.sh
 
 set -euo pipefail
 
@@ -83,8 +84,10 @@ firefox_profile() {
 # Une ligne « chemin_machine<TAB>chemin_repo » par entrée du manifest.
 # Une entrée suivie de « # linux » ou « # macos » est ignorée sur l'autre OS.
 # « firefox:chemin » est relatif au profil Firefox par défaut (voir firefox_profile).
+# « destination < source »: le fichier du repo de « source », posé à « destination » sur cette
+# machine (ex: une police de ~/.local/share/fonts installée dans ~/Library/Fonts sur Mac).
 entries() {
-    local line tag ff="" ff_done=0
+    local line tag src ff="" ff_done=0
     while IFS= read -r line || [[ -n $line ]]; do
         tag=""
         [[ $line == *"#"* ]] && tag="$(sed 's/^[[:space:]]*//; s/[[:space:]]*$//' <<<"${line#*#}")"
@@ -92,9 +95,18 @@ entries() {
         line="${line%%#*}"
         line="$(sed 's/^[[:space:]]*//; s/[[:space:]]*$//' <<<"$line")"
         [[ -z $line ]] && continue
+        src=$line
+        if [[ $line == *" < "* ]]; then
+            src="$(sed 's/^[[:space:]]*//' <<<"${line#* < }")"
+            line="$(sed 's/[[:space:]]*$//' <<<"${line%% < *}")"
+        fi
+        case $src in
+            "~/"*) src="$REPO_DIR/home/${src#\~/}" ;;
+            /*) src="$REPO_DIR/system$src" ;;
+        esac
         case $line in
-            "~/"*) printf '%s\t%s\n' "$HOME/${line#\~/}" "$REPO_DIR/home/${line#\~/}" ;;
-            /*) printf '%s\t%s\n' "$line" "$REPO_DIR/system$line" ;;
+            "~/"*) printf '%s\t%s\n' "$HOME/${line#\~/}" "$src" ;;
+            /*) printf '%s\t%s\n' "$line" "$src" ;;
             firefox:*)
                 if ((!ff_done)); then
                     ff_done=1
@@ -406,12 +418,34 @@ apply_one() {
     printf '  %s\n' "$(pretty "$sys")"
 }
 
+# ~/.ssh n'est pas suivi (clés, noms d'hôte): seule la ligne qui inclut les réglages communs
+# y est ajoutée, en tête pour qu'ils valent pour tous les hôtes.
+SSH_CONFIG="$HOME/.ssh/config"
+SSH_INCLUDE='Include ~/.config/ssh/common.conf'
+
+has_ssh_include() { grep -qxF "$SSH_INCLUDE" "$SSH_CONFIG" 2>/dev/null; }
+
+ensure_ssh_include() {
+    [[ -f $HOME/.config/ssh/common.conf ]] || return 0
+    has_ssh_include && return
+    mkdir -p "$HOME/.ssh"
+    if [[ -f $SSH_CONFIG ]]; then
+        backup_one "$SSH_CONFIG"
+        { printf '%s\n\n' "$SSH_INCLUDE"; cat "$SSH_CONFIG"; } >"$SSH_CONFIG.tmp"
+        mv "$SSH_CONFIG.tmp" "$SSH_CONFIG"
+    else
+        printf '%s\n' "$SSH_INCLUDE" >"$SSH_CONFIG"
+    fi
+    printf '  %s\n' "$(pretty "$SSH_CONFIG") (Include de ~/.config/ssh/common.conf)"
+}
+
 cmd_apply() {
     info "Copie repo → machine (sauvegarde dans $(pretty "$BACKUP_DIR"))..."
     local sys repo
     while IFS=$'\t' read -r sys repo; do
         apply_one "$sys" "$repo"
     done < <(entries)
+    ensure_ssh_include
     if [[ -d $HOME/.ssh ]]; then
         chmod 700 "$HOME/.ssh"
         [[ -f $HOME/.ssh/config ]] && chmod 600 "$HOME/.ssh/config"
@@ -469,6 +503,12 @@ cmd_status() {
         fi
         printf '  %-45s %s%s\n' "$(pretty "$sys")" "$state" "$NC"
     done < <(entries)
+    if has_ssh_include; then
+        state="${GREEN}ok"
+    else
+        state="${YELLOW}Include manquant (dot apply)"
+    fi
+    printf '  %-45s %s%s\n' "$(pretty "$SSH_CONFIG")" "$state" "$NC"
 }
 
 cmd_diff() {
@@ -682,9 +722,7 @@ install_base() {
         have brew || die "Homebrew introuvable (bootstrap.sh l'installe)"
         brew install git rsync bash fish neovim
         brew install --cask kitty font-jetbrains-mono-nerd-font
-        # Homebrew dans le PATH de zsh, le shell de connexion par défaut de macOS
-        grep -qs 'brew shellenv' "$HOME/.zprofile" ||
-            echo "eval \"\$($(command -v brew) shellenv)\"" >>"$HOME/.zprofile"
+        # Homebrew dans le PATH de zsh: ~/.zprofile (suivi) lit ~/.profile, qui charge brew shellenv
     else
         sudo dnf install -y git rsync fish neovim
         install_kitty
@@ -1167,6 +1205,13 @@ cmd_clean() {
     ok "Terminé: $(((after - before) / 1024)) Mo libérés."
 }
 
+cmd_defaults() {
+    [[ $OS == macos ]] || die "dot defaults: macOS seulement"
+    info "Réglages macOS (packages/macos/defaults.sh)..."
+    bash "$PKG_DIR/defaults.sh"
+    ok "Réglages appliqués (l'apparence et le clavier peuvent demander de rouvrir la session)."
+}
+
 login_shell() {
     if [[ $OS == macos ]]; then
         dscl . -read "/Users/$USER" UserShell | awk '{print $2}'
@@ -1186,6 +1231,7 @@ cmd_install() {
     # après les paquets: Mason compile avec go et npm (install_nvim_deps)
     info "nvim (plugins, parsers, paquets Mason)..."
     nvim_maint install
+    [[ $OS == macos ]] && cmd_defaults
 
     mkdir -p "$HOME/.local/bin"
     ln -sf "$REPO_DIR/dot" "$HOME/.local/bin/dot"
@@ -1207,7 +1253,7 @@ cmd_install() {
 }
 
 usage() {
-    sed -n '2,12s/^# \{0,1\}//p' "${BASH_SOURCE[0]}"
+    sed -n '2,13s/^# \{0,1\}//p' "${BASH_SOURCE[0]}"
     exit "${1:-0}"
 }
 
@@ -1223,6 +1269,7 @@ main() {
         install) cmd_install ;;
         upgrade) cmd_upgrade ;;
         clean) cmd_clean ;;
+        defaults) cmd_defaults ;;
         -h | --help | help) usage ;;
         *) usage 1 ;;
     esac
