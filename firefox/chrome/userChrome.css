@@ -3,6 +3,25 @@
   --window-buttons-width: 130px;
 }
 
+/* macOS: boutons de fenêtre (ronds rouge, orange, vert) à gauche, et moins larges */
+@media (-moz-platform: macos) {
+  :root {
+    --window-buttons-width: 80px;
+  }
+
+  #nav-bar {
+    padding-right: 0 !important;
+    padding-left: var(--window-buttons-width) !important;
+  }
+
+  /* Largeur fixée: à gauche, la barre s'étirait sur toute la fenêtre et recouvrait les boutons */
+  #TabsToolbar {
+    right: auto !important;
+    left: 0 !important;
+    width: var(--window-buttons-width) !important;
+  }
+}
+
 #navigator-toolbox {
   position: fixed !important;
   top: 0;
@@ -108,4 +127,21 @@ panel {
   margin: 0 !important;
   border-radius: 0 !important;
   box-shadow: none !important;
+}
+
+/* macOS: les ronds rouge, orange, vert sont dessinés par macOS, pas par Firefox. Au survol, Firefox
+   croit que la souris a quitté la barre et la cache. Délai avant de la cacher, le temps de cliquer.
+   (En fin de fichier pour passer après la transition de #navigator-toolbox plus haut.) */
+@media (-moz-platform: macos) {
+  #navigator-toolbox {
+    transition:
+      transform 0.2s ease-in-out 1s,
+      opacity 0.2s ease-in-out 1s !important;
+  }
+
+  #navigator-toolbox:hover,
+  #navigator-toolbox:focus-within,
+  #navigator-toolbox:has([open], [panelopen]) {
+    transition-delay: 0s !important;
+  }
 }

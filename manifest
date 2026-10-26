@@ -49,6 +49,6 @@
 /var/lib/pgsql/data/pg_hba.conf  # linux
 /var/lib/pgsql/data/pg_ident.conf  # linux
 
-# Firefox: relatif au profil par défaut (profiles.ini), Linux seulement pour l'instant
-firefox:chrome/   # linux
-firefox:user.js   # linux
+# Firefox: relatif au profil par défaut (profiles.ini)
+firefox:chrome/
+firefox:user.js

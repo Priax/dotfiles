@@ -29,9 +29,9 @@ defaults write com.apple.finder _FXSortFoldersFirst -bool true
 defaults write com.apple.finder NewWindowTarget -string PfDe
 defaults write com.apple.finder NewWindowTargetPath -string "file://$HOME/Desktop/"
 
-# Dock: petites icônes, toujours affiché
+# Dock: petites icônes, affiché seulement au survol du bas de l'écran
 defaults write com.apple.dock tilesize -float 30
-defaults write com.apple.dock autohide -bool false
+defaults write com.apple.dock autohide -bool true
 
 # Finder et Dock relisent leurs réglages au redémarrage
 killall Finder Dock 2>/dev/null || true
