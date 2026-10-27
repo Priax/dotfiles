@@ -41,6 +41,13 @@ NC=$'\033[0m'
 info() { printf '%s\n' "${YELLOW}$*${NC}"; }
 ok() { printf '%s\n' "${GREEN}$*${NC}"; }
 warn() { printf '%s\n' "${RED}$*${NC}" >&2; }
+# Échec d'une étape qui n'arrête pas la commande: affiché tout de suite, puis rappelé en fin
+# de commande (main), qui sort alors en erreur pour que « dot upgrade && dot push » s'arrête
+FAILURES=()
+fail() {
+    warn "$*"
+    FAILURES+=("${1#"${1%%[! ]*}"}")
+}
 die() {
     warn "Erreur: $*"
     exit 1
@@ -183,7 +190,7 @@ dump() {
     if ! "$@" >"$tmp" 2>"$err"; then
         rm -f "$tmp"
         # dernière ligne d'erreur: la cause (pour Python, la ligne d'exception sous la trace)
-        warn "  échec, liste conservée : ${out#"$REPO_DIR"/} ($(grep . "$err" | tail -n 1))"
+        fail "  échec, liste conservée : ${out#"$REPO_DIR"/} ($(grep . "$err" | tail -n 1))"
     elif [[ -s $tmp ]]; then
         mv "$tmp" "$out"
         printf '  %s (%s)\n' "${out#"$REPO_DIR"/}" "$(wc -l <"$out" | tr -d ' ')"
@@ -240,7 +247,7 @@ install_cargo_tools() {
     while read -r line; do
         [[ -n $line ]] || continue
         read -ra args <<<"$line"
-        cargo install "${args[@]}" || warn "  échec de ${args[0]}"
+        cargo install "${args[@]}" || fail "  échec de ${args[0]}"
     done <"$1"
     return 0
 }
@@ -583,7 +590,7 @@ install_rust_toolchains() {
         args=()
         [[ $comps != - ]] && args+=(--component "$comps")
         [[ $targets != - ]] && args+=(--target "$targets")
-        rustup toolchain install "$name" "${args[@]}" || warn "  échec de la toolchain $name"
+        rustup toolchain install "$name" "${args[@]}" || fail "  échec de la toolchain $name"
         [[ $def == default ]] && rustup default "$name"
     done <"$f"
     return 0
@@ -595,7 +602,7 @@ install_tools() {
     info "Outils hors gestionnaire de paquets..."
     if [[ ! -x $HOME/.cargo/bin/rustup ]] && ask "Installer Rust (rustup et les toolchains de rustup.txt) ?"; then
         curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs |
-            sh -s -- -y --no-modify-path --default-toolchain none || warn "  échec de rustup"
+            sh -s -- -y --no-modify-path --default-toolchain none || fail "  échec de rustup"
         # pour la suite (toolchains, puis cargo.txt) dans ce même script
         PATH="$HOME/.cargo/bin:$PATH"
         have rustup && install_rust_toolchains
@@ -606,7 +613,7 @@ install_tools() {
         [[ $OS == linux ]] &&
             sudo dnf install -y gcc gcc-c++ gmp gmp-devel make ncurses ncurses-compat-libs xz perl
         curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org |
-            BOOTSTRAP_HASKELL_NONINTERACTIVE=1 BOOTSTRAP_HASKELL_INSTALL_HLS=1 sh || warn "  échec de ghcup"
+            BOOTSTRAP_HASKELL_NONINTERACTIVE=1 BOOTSTRAP_HASKELL_INSTALL_HLS=1 sh || fail "  échec de ghcup"
     fi
     if [[ -x $HOME/.ghcup/bin/ghcup ]]; then
         PATH="$HOME/.ghcup/bin:$HOME/.cabal/bin:$PATH"
@@ -614,7 +621,7 @@ install_tools() {
         # --allow-newer=base: cabal-fmt 0.1.12 borne base à 4.19 (GHC 9.8) mais compile avec
         # le GHC recommandé (9.10, base 4.20)
         if ! have cabal-fmt && ask "Compiler cabal-fmt (plusieurs minutes) ?"; then
-            { cabal update && cabal install cabal-fmt --allow-newer=base; } || warn "  échec de cabal-fmt"
+            { cabal update && cabal install cabal-fmt --allow-newer=base; } || fail "  échec de cabal-fmt"
         fi
     fi
 
@@ -623,15 +630,15 @@ install_tools() {
             brew install fnm
         else
             curl -fsSL https://fnm.vercel.app/install |
-                bash -s -- --install-dir "$HOME/.local/bin" --skip-shell || warn "  échec de fnm"
+                bash -s -- --install-dir "$HOME/.local/bin" --skip-shell || fail "  échec de fnm"
             PATH="$HOME/.local/bin:$PATH"
         fi
         if have fnm; then
-            { fnm install --lts && fnm default lts-latest; } || warn "  échec de l'installation de Node"
+            { fnm install --lts && fnm default lts-latest; } || fail "  échec de l'installation de Node"
         fi
     fi
     if [[ ! -x $HOME/.deno/bin/deno ]] && ask "Installer Deno ?"; then
-        curl -fsSL https://deno.land/install.sh | sh -s -- -y --no-modify-path || warn "  échec de deno"
+        curl -fsSL https://deno.land/install.sh | sh -s -- -y --no-modify-path || fail "  échec de deno"
     fi
 }
 
@@ -642,7 +649,7 @@ install_kitty() {
     [[ -x $app/bin/kitty ]] && return
     info "Installation de kitty (installeur officiel)..."
     curl -fsSL https://sw.kovidgoyal.net/kitty/installer.sh | sh /dev/stdin launch=n || {
-        warn "  échec de l'installeur kitty"
+        fail "  échec de l'installeur kitty"
         return
     }
     # intégration au bureau, comme indiqué dans la doc de kitty
@@ -659,19 +666,19 @@ setup_dnf_repos() {
     fedora="$(rpm -E %fedora)"
     if grep -q '^rpmfusion-free' "$list"; then
         sudo dnf install -y "https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$fedora.noarch.rpm" ||
-            warn "  échec de RPM Fusion free"
+            fail "  échec de RPM Fusion free"
     fi
     if grep -q '^rpmfusion-nonfree' "$list"; then
         sudo dnf install -y "https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$fedora.noarch.rpm" ||
-            warn "  échec de RPM Fusion nonfree"
+            fail "  échec de RPM Fusion nonfree"
     fi
     if grep -q '^docker-ce' "$list" && [[ ! -f /etc/yum.repos.d/docker-ce.repo ]]; then
         sudo dnf config-manager addrepo --from-repofile=https://download.docker.com/linux/fedora/docker-ce.repo ||
-            warn "  échec du dépôt docker-ce"
+            fail "  échec du dépôt docker-ce"
     fi
     if grep -q '^pgAdmin4' "$list"; then
         sudo dnf install -y https://ftp.postgresql.org/pub/pgadmin/pgadmin4/yum/pgadmin4-fedora-repo-2-1.noarch.rpm ||
-            warn "  échec du dépôt pgAdmin4"
+            fail "  échec du dépôt pgAdmin4"
     fi
     return 0
 }
@@ -693,7 +700,7 @@ install_nerd_font() {
     current="$(cat "$dest/.version" 2>/dev/null || true)"
     if [[ -z $latest ]]; then
         [[ -n $current ]] && return 0
-        warn "  dernière version de JetBrainsMono Nerd Font introuvable (hors ligne ?)"
+        fail "  dernière version de JetBrainsMono Nerd Font introuvable (hors ligne ?)"
         return 0
     fi
     [[ $current == "$latest" ]] && return 0
@@ -711,7 +718,7 @@ install_nerd_font() {
         fc-cache -f "$dest" >/dev/null
         ok "  installée: relance kitty pour qu'il l'utilise (il ne recharge pas les polices à chaud)"
     else
-        warn "  téléchargement impossible, police à installer à la main"
+        fail "  téléchargement impossible, police à installer à la main"
     fi
     rm -rf "$tmp"
 }
@@ -934,7 +941,7 @@ LUA
     DOT_NVIM=$1 DOT_NVIM_LIST=${2:-} nvim --headless -c "luafile $script" 2>&1 |
         sed 's/image\.nvim: cannot query terminal size (non-terminal environment?)//' |
         { grep -vE '(Running|Finished) task|Récupération du sous-module|Fetching submodule|HEAD est maintenant sur|HEAD is now at' || true; }
-    ((PIPESTATUS[0] == 0)) || warn "  nvim: échec de l'entretien"
+    ((PIPESTATUS[0] == 0)) || fail "  nvim: échec de l'entretien"
     rm -f "$script"
 }
 
@@ -947,7 +954,7 @@ upgrade_kitty() {
     if [[ -n $latest && $current != "$latest" ]]; then
         info "kitty: $current → $latest..."
         curl -fsSL https://sw.kovidgoyal.net/kitty/installer.sh | sh /dev/stdin launch=n ||
-            warn "  échec de la mise à jour de kitty"
+            fail "  échec de la mise à jour de kitty"
     fi
 }
 
@@ -973,28 +980,28 @@ for name, info in sorted(json.loads(sys.stdin.read() or "{}").items()):
         info "  à jour"
         return 0
     fi
-    "${sudo[@]}" "$npm" install -g "${pkgs[@]}" || warn "  échec de la mise à jour npm"
+    "${sudo[@]}" "$npm" install -g "${pkgs[@]}" || fail "  échec de la mise à jour npm"
 }
 
 cmd_upgrade() {
     info "Paquets système..."
     if [[ $OS == macos ]]; then
-        { brew update && brew upgrade; } || warn "  échec de brew upgrade"
+        { brew update && brew upgrade; } || fail "  échec de brew upgrade"
     else
-        sudo dnf upgrade --refresh || warn "  dnf: mise à jour interrompue"
-        if have flatpak; then flatpak update -y || warn "  échec de flatpak update"; fi
+        sudo dnf upgrade --refresh || fail "  dnf: mise à jour interrompue"
+        if have flatpak; then flatpak update -y || fail "  échec de flatpak update"; fi
         upgrade_kitty
     fi
     install_nerd_font
 
     if have rustup; then
         info "Rust (toolchains, puis outils cargo)..."
-        rustup update || warn "  échec de rustup update"
+        rustup update || fail "  échec de rustup update"
         if have cargo; then install_cargo_tools <(pkg_cargo); fi
     fi
     if have ghcup; then
         info "Haskell (versions recommandées)..."
-        ghcup upgrade || warn "  échec de ghcup upgrade"
+        ghcup upgrade || fail "  échec de ghcup upgrade"
         # ghcup vient d'être mis à jour: sans ça, chaque commande suivante répète « New … version
         # available » (versions plus récentes que les recommandées, volontairement pas suivies)
         export GHCUP_SKIP_UPDATE_CHECK=1
@@ -1002,9 +1009,9 @@ cmd_upgrade() {
         for tool in ghc hls cabal stack; do
             # la version recommandée déjà installée: juste l'activer (install afficherait un avertissement)
             if ghcup list -t "$tool" -c installed -r 2>/dev/null | grep -qw recommended; then
-                ghcup set "$tool" recommended || warn "  échec de $tool"
+                ghcup set "$tool" recommended || fail "  échec de $tool"
             else
-                ghcup install "$tool" recommended --set || warn "  échec de $tool"
+                ghcup install "$tool" recommended --set || fail "  échec de $tool"
             fi
         done
     fi
@@ -1017,11 +1024,11 @@ cmd_upgrade() {
         if [[ -n $lts ]] && fnm list | grep -qw "$lts"; then
             info "  $lts, dernière LTS, déjà installée"
         else
-            fnm install --lts || warn "  échec de fnm"
+            fnm install --lts || fail "  échec de fnm"
         fi
     fi
     upgrade_npm
-    if have deno; then deno upgrade || warn "  échec de deno upgrade"; fi
+    if have deno; then deno upgrade || fail "  échec de deno upgrade"; fi
 
     info "nvim (plugins, parsers, paquets Mason)..."
     nvim_maint upgrade
@@ -1037,7 +1044,7 @@ clean_ghcup_inactive() {
         read -r tool version _ <<<"$line"
         [[ $tool == ghcup ]] && continue
         if ask "  $tool $version installé mais pas actif, le supprimer ?"; then
-            ghcup rm "$tool" "$version" || warn "  échec de la suppression de $tool $version"
+            ghcup rm "$tool" "$version" || fail "  échec de la suppression de $tool $version"
         fi
     done 3< <(comm -23 <(ghcup list -c installed -r 2>/dev/null | awk '{print $1, $2}' | sort) \
         <(ghcup list -c set -r 2>/dev/null | awk '{print $1, $2}' | sort))
@@ -1074,7 +1081,7 @@ clean_fnm_versions() {
             continue
         fi
         if ask "  Node $version (aucun alias fnm, aucun .nvmrc), la supprimer ?"; then
-            fnm uninstall "$version" || warn "  échec de la suppression de Node $version"
+            fnm uninstall "$version" || fail "  échec de la suppression de Node $version"
         fi
     done
     return 0
@@ -1273,6 +1280,11 @@ main() {
         -h | --help | help) usage ;;
         *) usage 1 ;;
     esac
+    if ((${#FAILURES[@]})); then
+        warn "Étapes en échec:"
+        printf '%s\n' "${FAILURES[@]/#/  - }" >&2
+        exit 1
+    fi
 }
 
 # Sur une seule ligne, en fin de fichier: bash a déjà tout lu avant d'exécuter main, et exit

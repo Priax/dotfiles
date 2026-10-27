@@ -142,8 +142,6 @@ kde-settings-pulseaudio
 kdialog
 kdnssd
 kernel
-kernel-debug
-kernel-debug-devel
 kernel-devel
 kf6-baloo-file
 kfind
