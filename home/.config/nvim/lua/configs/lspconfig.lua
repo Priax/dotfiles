@@ -1,6 +1,7 @@
 require("nvchad.configs.lspconfig").defaults()
 
-local servers = { "html", "cssls", "ts_ls", "rust_analyzer", "clangd", "eslint", "gopls", "mdx_analyzer", "astro" }
+local servers =
+    { "html", "cssls", "ts_ls", "rust_analyzer", "clangd", "eslint", "gopls", "mdx_analyzer", "marksman", "astro" }
 
 -- defaults() règle déjà capabilities (vim.lsp.config "*") et on_attach (autocmd LspAttach)
 -- pour tous les serveurs, et nvim-lspconfig fournit cmd/filetypes/root_markers (lsp/<nom>.lua):
