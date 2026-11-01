@@ -20,7 +20,8 @@ dot status     # qu'est-ce qui a changé ?
 dot diff fish  # voir le détail (filtre optionnel)
 dot push       # machine → repo, commit, push
 dot pull       # git pull, repo → machine (l'existant est sauvegardé dans ~/dotfiles_backup/),
-               # puis plugins nvim (lazy-lock.json), parsers et paquets Mason manquants
+               # puis plugins nvim (lazy-lock.json), parsers et paquets Mason manquants;
+               # refuse d'écraser un fichier modifié sur la machine: dot push d'abord
 dot upgrade    # met tout à jour (voir plus bas)
 dot clean      # retire paquets inutilisés et caches (voir plus bas)
 dot defaults   # macOS: réglages système (packages/macos/defaults.sh), aussi lancé par dot install
@@ -36,8 +37,14 @@ go, cargo, ghcup, miniatures, logs de nvim). Tout ce qui est *déduit* est list�
 paquets devenus inutiles (dnf/brew autoremove), store cabal des GHC désinstallés, parsers et
 paquets Mason hors de la config nvim (peut-être installés à la main), versions inactives de
 GHC/HLS/cabal/stack (laissées par `dot upgrade`), versions de Node sans alias fnm, journaux système,
-corbeille, images Docker/Podman. Les plugins retirés de la config nvim partent sans demander
+corbeille, images Docker/Podman, sauvegardes de `dot apply` de plus de 30 jours. Les plugins retirés de la config nvim partent sans demander
 (lazy le déduit de la config elle-même).
+
+Les dossiers du manifest sont des miroirs dans les deux sens: `dot apply` retire aussi de la machine
+ce qui n'est plus dans le repo (après sauvegarde), sauf les fichiers exclus (`fish_variables`…).
+
+Le repo est public: `dot push` annule le commit si un secret est détecté, avec ses propres motifs et
+`gitleaks`.
 
 Suivre un nouveau fichier: l'ajouter dans `manifest`, puis `dot push`.
 Entrée propre à un OS: ajouter `# linux` ou `# macos` en fin de ligne dans `manifest`.
@@ -51,7 +58,7 @@ Fichier du profil Firefox: `firefox:chemin` (le dossier du profil est retrouvé 
 curl -fsSL https://raw.githubusercontent.com/Priax/dotfiles/main/bootstrap.sh | bash
 ```
 
-Même commande sur Fedora et sur macOS. Installe git, rsync, fish, nvim, kitty et
+Même commande sur Fedora et sur macOS. Installe git, rsync, gitleaks, fish, nvim, kitty et
 JetBrainsMono Nerd Font (sur Mac: Homebrew d'abord, puis bash et rsync récents),
 déploie les configs, propose d'installer les paquets de `packages/<os>/` et de
 passer à fish.

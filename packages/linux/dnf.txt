@@ -83,6 +83,7 @@ fpaste
 fprintd-pam
 gfs2-utils
 gimp
+gitleaks
 glfw-devel
 glm-devel
 gnupg2-g13

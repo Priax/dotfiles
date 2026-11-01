@@ -5,9 +5,9 @@
 #   dot diff [p]  diff détaillé (optionnellement filtré sur p)
 #   dot save      copie machine → repo (+ listes de paquets), sans git
 #   dot push      save + commit + git pull --rebase + git push
-#   dot apply     copie repo → machine (avec sauvegarde de l'existant)
+#   dot apply     copie repo → machine, dossiers en miroir (avec sauvegarde de l'existant)
 #   dot pull      git pull + apply
-#   dot install   nouvelle machine : dépendances + apply + paquets
+#   dot install   nouvelle machine: dépendances + apply + paquets
 #   dot upgrade   met tout à jour: paquets, toolchains, outils, police, nvim
 #   dot clean     retire paquets inutilisés et caches (re-téléchargés au besoin)
 #   dot defaults  macOS: applique les réglages système de packages/macos/defaults.sh
@@ -158,7 +158,7 @@ save_one() {
     local sys=$1 repo=$2
     if [[ $sys == */ ]]; then
         if [[ ! -d $sys ]]; then
-            warn "  absent : $(pretty "$sys")"
+            warn "  absent: $(pretty "$sys")"
             return
         fi
         mkdir -p "$repo"
@@ -174,7 +174,7 @@ save_one() {
             [[ -r $sys && -O $sys ]] && chmod "$(stat -L -c %a "$sys" 2>/dev/null || stat -L -f %Lp "$sys")" "$repo"
         else
             rm -f "$tmp"
-            warn "  illisible ou absent : $(pretty "$sys")"
+            warn "  illisible ou absent: $(pretty "$sys")"
             return
         fi
     fi
@@ -190,7 +190,7 @@ dump() {
     if ! "$@" >"$tmp" 2>"$err"; then
         rm -f "$tmp"
         # dernière ligne d'erreur: la cause (pour Python, la ligne d'exception sous la trace)
-        fail "  échec, liste conservée : ${out#"$REPO_DIR"/} ($(grep . "$err" | tail -n 1))"
+        fail "  échec, liste conservée: ${out#"$REPO_DIR"/} ($(grep . "$err" | tail -n 1))"
     elif [[ -s $tmp ]]; then
         mv "$tmp" "$out"
         printf '  %s (%s)\n' "${out#"$REPO_DIR"/}" "$(wc -l <"$out" | tr -d ' ')"
@@ -320,14 +320,23 @@ cmd_save() {
 }
 
 check_secrets() {
-    local pattern='BEGIN [A-Z ]*PRIVATE KEY|aws_secret_''access_key|ghp_[A-Za-z0-9]{20,}|github_''pat_|xox[abp]-'
+    # repo public: ce qui est poussé est exposé, et le reste même après un commit de suppression
+    local pattern='BEGIN [A-Z ]*PRIVATE KEY|aws_secret_''access_key|AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9]{20,}|github_''pat_|xox[abp]-'
+    pattern+='|sk-ant-[A-Za-z0-9_-]{20,}|sk-[A-Za-z0-9]{32,}|npm_[A-Za-z0-9]{30,}|glpat-[A-Za-z0-9_-]{15,}|AIza[0-9A-Za-z_-]{30,}'
     local hits
     hits="$(git -C "$REPO_DIR" diff --cached -U0 | grep -E '^\+' | grep -E "$pattern" || true)"
     if [[ -n $hits ]]; then
         git -C "$REPO_DIR" reset -q
-        warn "Ce qui ressemble à un secret a été détecté, commit annulé :"
+        warn "Ce qui ressemble à un secret a été détecté, commit annulé:"
         printf '%s\n' "$hits" | cut -c1-80 >&2
         exit 1
+    fi
+    # gitleaks (install_base) connaît bien plus de formats; sans lui, seuls les motifs ci-dessus
+    if ! have gitleaks; then
+        warn "gitleaks absent, secrets cherchés avec les seuls motifs de dot (dnf ou brew install gitleaks)"
+    elif ! gitleaks git --staged --pre-commit --redact --no-banner --log-level warn "$REPO_DIR"; then
+        git -C "$REPO_DIR" reset -q
+        die "gitleaks a signalé un secret, commit annulé"
     fi
 }
 
@@ -351,15 +360,16 @@ cmd_push() {
     local before after
     before="$(git rev-parse '@{u}')"
     git pull -q --rebase ||
-        die "conflit avec l'autre machine: corrige les fichiers (git status), puis « git rebase --continue », « git push » et « dot apply »"
+        die "conflit avec l'autre machine: corrige les fichiers (git status), puis « git rebase --continue », « dot apply » et « git push »"
     after="$(git rev-parse '@{u}')"
-    git push -q origin HEAD
-    ok "Dotfiles commités et poussés."
     # Sinon le prochain push, fait depuis cette machine pas à jour, annulerait ces changements.
+    # Avant le push: s'il échoue, le suivant ne verrait plus de différence et n'installerait rien.
     if [[ $after != "$before" ]]; then
         info "Changements de l'autre machine récupérés, installation ici..."
         cmd_apply
     fi
+    git push -q origin HEAD
+    ok "Dotfiles commités et poussés."
 }
 
 
@@ -392,10 +402,10 @@ backup_one() {
 apply_one() {
     local sys=$1 repo=$2
     if [[ ! -e ${repo%/} ]]; then
-        warn "  pas dans le repo : $(pretty "$sys")"
+        warn "  pas dans le repo: $(pretty "$sys")"
         return
     fi
-    # Ne jamais créer de dossier système : /var/lib/pgsql/data créé par nous
+    # Ne jamais créer de dossier système: /var/lib/pgsql/data créé par nous
     # ferait échouer « postgresql-setup --initdb ».
     local parent
     parent="$(dirname "${sys%/}")"
@@ -414,7 +424,9 @@ apply_one() {
     if [[ $sys == */ ]]; then
         mkdir -p "$sys"
         mapfile -t ex < <(rsync_excludes)
-        rsync -a "${ex[@]}" "$repo" "$sys"
+        # --delete, comme save_one: sinon un fichier supprimé sur l'autre machine reste ici et le
+        # prochain push le remet dans le repo. L'existant vient d'être sauvegardé, les exclus restent.
+        rsync -a --delete "${ex[@]}" "$repo" "$sys"
     elif [[ $sys == "$HOME"/* ]]; then
         mkdir -p "$(dirname "$sys")"
         cp "$repo" "$sys"
@@ -470,10 +482,24 @@ cmd_pull() {
     local dirty
     dirty="$(git -C "$REPO_DIR" status --porcelain)"
     if [[ -n $dirty ]]; then
-        warn "Le repo contient des changements de cette machine qui n'ont pas été poussés :"
+        warn "Le repo contient des changements de cette machine qui n'ont pas été poussés:"
         printf '%s\n' "$dirty" >&2
         warn "Soit « dot push » pour les envoyer (fusionnés avec ceux de l'autre machine),"
         warn "soit, pour les abandonner: git -C $(pretty "$REPO_DIR") checkout -- <fichier>"
+        exit 1
+    fi
+    # Fichiers modifiés sur la machine sans dot save: l'apply de la suite les écraserait
+    local changed=() sys repo
+    while IFS=$'\t' read -r sys repo; do
+        if [[ -e ${repo%/} ]] && sys_exists "${sys%/}" && differs "$sys" "$repo"; then
+            changed+=("$(pretty "$sys")")
+        fi
+    done < <(entries)
+    if ((${#changed[@]})); then
+        warn "Ces fichiers ont changé sur cette machine et seraient écrasés:"
+        printf '  %s\n' "${changed[@]}" >&2
+        warn "Soit « dot push » pour les envoyer (fusionnés avec ceux de l'autre machine),"
+        warn "soit « dot apply » pour les abandonner (copie dans ~/dotfiles_backup), puis « dot pull »."
         exit 1
     fi
     git -C "$REPO_DIR" pull --ff-only
@@ -538,7 +564,7 @@ cmd_diff() {
 install_packages() {
     local d="$PKG_DIR"
     if [[ -s $d/dnf-repos.txt ]]; then
-        info "Dépôts utilisés sur l'ancienne machine :"
+        info "Dépôts utilisés sur l'ancienne machine:"
         tr '\n' ' ' <"$d/dnf-repos.txt"
         echo
         if ask "Ajouter ceux qu'on sait configurer (RPM Fusion, docker-ce, pgAdmin4) ?"; then
@@ -727,11 +753,11 @@ install_base() {
     info "Installation des dépendances de base..."
     if [[ $OS == macos ]]; then
         have brew || die "Homebrew introuvable (bootstrap.sh l'installe)"
-        brew install git rsync bash fish neovim
+        brew install git rsync bash fish neovim gitleaks
         brew install --cask kitty font-jetbrains-mono-nerd-font
         # Homebrew dans le PATH de zsh: ~/.zprofile (suivi) lit ~/.profile, qui charge brew shellenv
     else
-        sudo dnf install -y git rsync fish neovim
+        sudo dnf install -y git rsync fish neovim gitleaks
         install_kitty
         install_nerd_font
     fi
@@ -773,6 +799,23 @@ local mode = vim.env.DOT_NVIM
 local function say(m)
     io.stdout:write("  " .. m .. "\n")
     io.stdout:flush()
+end
+
+-- un échec est affiché tout de suite, et nvim sort en erreur à la fin (cq): voir fail dans dot
+local had_error = false
+local function report(m)
+    had_error = true
+    say(m)
+end
+
+-- lazy ne lève pas d'erreur: l'échec d'un git fetch reste noté sur le plugin
+local function check_plugins()
+    local Plugin = require "lazy.core.plugin"
+    for name, plugin in pairs(require("lazy.core.config").plugins) do
+        if Plugin.has_errors(plugin) then
+            report("échec du plugin " .. name)
+        end
+    end
 end
 
 local function mason_ready()
@@ -828,14 +871,16 @@ local function run_all(jobs)
     for _, job in ipairs(jobs) do
         job(function(success, err)
             if not success then
-                say("échec: " .. tostring(err))
+                report("échec: " .. tostring(err))
             end
             pending = pending - 1
         end)
     end
-    vim.wait(1800000, function()
+    if not vim.wait(1800000, function()
         return pending == 0
-    end, 500)
+    end, 500) then
+        report "paquets Mason: délai dépassé"
+    end
 end
 
 -- toujours quitter, même sur une erreur (sinon nvim headless reste ouvert)
@@ -851,6 +896,7 @@ local ok, err = xpcall(function()
         say "plugins retirés de la config (lazy clean)..."
         lazy.clean { wait = true, show = false }
     end
+    check_plugins()
     lazy.load { plugins = { "nvim-lspconfig", "conform.nvim", "mason.nvim", "nvim-treesitter" } }
     local ts = require "nvim-treesitter"
     local mr = mason_ready()
@@ -864,8 +910,11 @@ local ok, err = xpcall(function()
         end, require("lazy.core.plugin").values(spec, "opts", false).ensure_installed or {})
         if #missing > 0 then
             say("parsers treesitter manquants: " .. table.concat(missing, ", "))
-            ts.install(missing):wait(900000)
+            local installed_all = ts.install(missing):wait(900000)
             io.stdout:write "\n" -- les messages de nvim-treesitter ne finissent pas par un retour à la ligne
+            if not installed_all then
+                report "échec de l'installation de parsers treesitter"
+            end
         end
         local failed, started = nil, 0
         require("configs.mason").install_all(function(f)
@@ -874,11 +923,13 @@ local ok, err = xpcall(function()
             started = started + 1
             say("Mason: installation de " .. name)
         end)
-        vim.wait(1800000, function()
+        if not vim.wait(1800000, function()
             return failed ~= nil
-        end, 500)
+        end, 500) then
+            report "paquets Mason: délai dépassé"
+        end
         for _, line in ipairs(failed or {}) do
-            say("échec Mason " .. line)
+            report("échec Mason " .. line)
         end
         if #missing == 0 and started == 0 then
             say "parsers et paquets Mason: rien ne manque"
@@ -886,7 +937,9 @@ local ok, err = xpcall(function()
     end
     if mode == "upgrade" then
         say "mise à jour des parsers treesitter..."
-        ts.update():wait(600000)
+        if not ts.update():wait(600000) then
+            report "échec de la mise à jour de parsers treesitter"
+        end
         local jobs = {}
         for _, pkg in ipairs(mr.get_installed_packages()) do
             local current, latest = pkg:get_installed_version(), pkg:get_latest_version()
@@ -930,9 +983,9 @@ local ok, err = xpcall(function()
     end
 end, debug.traceback)
 if not ok then
-    say("erreur: " .. err)
+    report("erreur: " .. err)
 end
-vim.cmd "qa!"
+vim.cmd(had_error and "cq" or "qa!")
 LUA
     # sans le détail de chaque tâche git de lazy (une dizaine de lignes par plugin, avec ou sans
     # couleurs ANSI selon le terminal); les erreurs et les messages de ce script restent affichés.
@@ -940,8 +993,8 @@ LUA
     # message retiré ici plutôt qu'avec un cond dans la config, qui empêcherait lazy de le mettre à jour
     DOT_NVIM=$1 DOT_NVIM_LIST=${2:-} nvim --headless -c "luafile $script" 2>&1 |
         sed 's/image\.nvim: cannot query terminal size (non-terminal environment?)//' |
-        { grep -vE '(Running|Finished) task|Récupération du sous-module|Fetching submodule|HEAD est maintenant sur|HEAD is now at' || true; }
-    ((PIPESTATUS[0] == 0)) || fail "  nvim: échec de l'entretien"
+        { grep -vE '(Running|Finished) task|Récupération du sous-module|Fetching submodule|HEAD est maintenant sur|HEAD is now at' || true; } ||
+        fail "  nvim: échec de l'entretien"
     rm -f "$script"
 }
 
@@ -1020,7 +1073,7 @@ cmd_upgrade() {
         # sans « fnm default »: le défaut choisi reste. S'il vaut lts-latest (machine installée par
         # dot), il suit cet alias, que fnm install --lts déplace sur la nouvelle LTS.
         local lts
-        lts="$(fnm ls-remote --lts --latest 2>/dev/null | awk '{print $1}')"
+        lts="$(fnm ls-remote --lts --latest 2>/dev/null | awk '{print $1}' || true)"
         if [[ -n $lts ]] && fnm list | grep -qw "$lts"; then
             info "  $lts, dernière LTS, déjà installée"
         else
@@ -1070,7 +1123,7 @@ clean_fnm_versions() {
     installed="$(for dir in "$(fnm_dir)"/node-versions/v*/; do basename "$dir"; done | sed 's/^v//' | sort -V)"
     while read -r req path; do
         [[ $req =~ ^[0-9]+(\.[0-9]+)*$ ]] || continue # lts/iron, node…: alias fnm, pas une version
-        wanted="$(grep -E "^${req//./\\.}(\.|$)" <<<"$installed" | tail -n 1)"
+        wanted="$(grep -E "^${req//./\\.}(\.|$)" <<<"$installed" | tail -n 1 || true)"
         [[ -n $wanted ]] && keep+="v$wanted $(pretty "$path")"$'\n'
     done < <(node_version_files)
     for dir in "$(fnm_dir)"/node-versions/v*/; do
@@ -1140,6 +1193,14 @@ empty_trash() {
     fi
 }
 
+# Sauvegardes de dot apply: copies de fichiers suivis, inutiles passé un mois
+clean_backups() {
+    local old
+    mapfile -t old < <(find "$HOME/dotfiles_backup" -mindepth 1 -maxdepth 1 -type d -mtime +30 2>/dev/null)
+    ((${#old[@]})) || return 0
+    if ask "Supprimer ${#old[@]} sauvegarde(s) de dot apply de plus de 30 jours ?"; then rm -rf "${old[@]}"; fi
+}
+
 free_kb() { df -Pk "$HOME" | awk 'NR == 2 {print $4}'; }
 
 # Principe: les caches (re-téléchargés au besoin) sont vidés sans demander; tout ce qui est
@@ -1167,6 +1228,8 @@ cmd_clean() {
         empty_trash
         rm -rf "$HOME/.cache/thumbnails"
     fi
+
+    clean_backups
 
     info "Caches des outils de dev (re-téléchargés au besoin)..."
     # --force obligatoire pour vider le cache, et npm avertit ensuite de son usage: erreurs seules
