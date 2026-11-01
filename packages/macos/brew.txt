@@ -4,6 +4,7 @@ fish
 fnm
 git
 git-lfs
+gitleaks
 go
 imagemagick
 neovim
