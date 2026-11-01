@@ -1,1 +1,2 @@
 one.flipperzero.qFlipper
+org.libretro.RetroArch
