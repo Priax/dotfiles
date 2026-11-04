@@ -162,6 +162,7 @@ kpat
 krdc
 krdp
 krfb
+krita
 kscreen
 ksshaskpass
 kwalletmanager5
