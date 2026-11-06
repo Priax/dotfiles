@@ -82,6 +82,7 @@ fontforge
 fpaste
 fprintd-pam
 gfs2-utils
+gh
 gimp
 gitleaks
 glfw-devel
