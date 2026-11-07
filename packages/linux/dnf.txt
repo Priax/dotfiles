@@ -207,7 +207,6 @@ NetworkManager-config-connectivity-fedora
 NetworkManager-ppp
 nfs-utils
 nginx
-ninja-build
 nmap
 nodejs24-npm
 okular
@@ -344,6 +343,8 @@ vlc-plugin-gstreamer
 vlc-plugins-freeworld
 webkit2gtk4.1-devel
 whois
+wine
+winetricks
 wireshark
 wkhtmltopdf
 words
