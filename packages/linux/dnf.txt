@@ -175,7 +175,6 @@ libappindicator-gtk3-devel
 libconfig-devel
 libertas-firmware
 libgit2_1.8
-libheif-freeworld
 libpcap-devel
 libreoffice-calc
 libreoffice-draw
@@ -297,6 +296,7 @@ spice-webdavd
 sssd-kcm
 sssd-proxy
 stack
+steam
 strace
 symlinks
 system-config-printer-udev
