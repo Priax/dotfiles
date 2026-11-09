@@ -604,6 +604,26 @@ install_packages() {
     fi
 }
 
+# Groupes système à rejoindre, après les paquets qui les créent.
+# pipewire: priorité temps réel et memlock pour l'audio (Fedora: /etc/security/limits.d/25-pw-rlimits.conf),
+# sans quoi `ulimit -r` vaut 0 et les buffers courts craquent (FL Studio, etc.).
+setup_groups() {
+    [[ $OS == linux ]] || return 0
+    local g missing=()
+    for g in pipewire; do
+        getent group "$g" >/dev/null || continue
+        # /etc/group, pas la session: un ajout récent compte déjà
+        id -nG "$USER" | tr ' ' '\n' | grep -qx "$g" || missing+=("$g")
+    done
+    ((${#missing[@]})) || return 0
+    if ask "Ajouter $USER au groupe ${missing[*]} (temps réel pour l'audio) ?"; then
+        for g in "${missing[@]}"; do
+            sudo usermod -aG "$g" "$USER" || fail "  échec de l'ajout au groupe $g"
+        done
+        info "Pris en compte à la prochaine connexion (vérifier: ulimit -r)."
+    fi
+}
+
 # Toolchains de rustup.txt (celui de cet OS, sinon celui de l'autre: noms sans l'hôte)
 install_rust_toolchains() {
     local f="$PKG_DIR/rustup.txt" name def comps targets args
@@ -1298,6 +1318,7 @@ cmd_install() {
     # avant les paquets: cargo.txt a besoin du cargo de rustup
     install_tools
     install_packages
+    setup_groups
     # après les paquets: Mason compile avec go et npm (install_nvim_deps)
     info "nvim (plugins, parsers, paquets Mason)..."
     nvim_maint install

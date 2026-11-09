@@ -65,13 +65,15 @@ passer à fish.
 
 Installe aussi:
 
-- les dépendances de la config nvim (go, npm, tree-sitter, ripgrep, ImageMagick, ffmpeg…);
+- les dépendances de la config nvim (go, npm, tree-sitter, ripgrep, ImageMagick, ffmpeg...);
 - par leur script officiel, ce qu'aucun gestionnaire de paquets ne suit: Rust (toutes les
   toolchains de `rustup.txt`, avec composants et cibles), Haskell via ghcup (versions
   recommandées du moment, + cabal-fmt en option), fnm (+ dernière LTS de Node), Deno,
   et kitty sur Linux;
 - les dépôts dnf tiers de `dnf-repos.txt` (RPM Fusion, docker-ce, pgAdmin4), avant les paquets;
-- les paquets npm globaux de `npm-global.txt` (npm du système, pas celui de fnm).
+- les paquets npm globaux de `npm-global.txt` (npm du système, pas celui de fnm);
+- sur Linux, l'ajout au groupe `pipewire` (priorité temps réel pour l'audio, effective à la
+  prochaine connexion: `ulimit -r` doit afficher 70).
 
 JetBrainsMono Nerd Font: sur Linux, `dot install` et `dot pull` la mettent à jour quand une
 nouvelle version sort (version notée dans `~/.local/share/fonts/JetBrainsMonoNerdFont/.version`).
@@ -96,5 +98,15 @@ Ni paquet ni installeur scriptable, à récupérer sur leur site:
 - Anki
 - STM32CubeIDE
 - wrk
-- Vesktop (RPM de la release GitHub)
-- VirtualBox (dépôt Oracle)
+- Vesktop
+- VirtualBox
+- Olympus
+- FL Studio (installeur de l'archive Image-Line (forum, "FL Studio Installer
+  Archive"), puis `fl install <installeur.exe>`. Ensuite débloquer avec le compte Image-Line, réinstaller
+  les plugins tiers (Waves Central: `fl install`).
+
+Installées par `dnf.txt`, mais leurs données ne sont pas suivies:
+
+- Steam: se reconnecter, les jeux sont à retélécharger (ou copier `~/.local/share/Steam/steamapps`).
+- Krita: réglages, brosses et ressources à reconfigurer (ou copier `~/.local/share/krita` et
+  `~/.config/kritarc`).

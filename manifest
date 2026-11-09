@@ -42,6 +42,11 @@
 ~/.config/fcitx5/profile   # linux
 ~/.config/fcitx5/config    # linux
 
+# Audio: micro anti-écho par défaut (PipeWire)
+~/.config/pipewire/pipewire.conf.d/60-echo-cancel.conf  # linux
+# Lanceur FL Studio sous Wine (préfixe, micro, MIDI, entrée de menu)
+~/.local/bin/fl  # linux
+
 /etc/docker/daemon.json  # linux
 
 /var/lib/pgsql/data/postgresql.conf  # linux
