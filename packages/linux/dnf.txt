@@ -196,6 +196,7 @@ mesa-compat-libOSMesa
 microcode_ctl
 minicom
 mpage
+mpv
 mtr
 nasm
 neochat
@@ -349,5 +350,4 @@ wireshark
 wkhtmltopdf
 words
 xxd
-yt-dlp
 zram-generator-defaults

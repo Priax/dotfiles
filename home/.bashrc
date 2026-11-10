@@ -59,6 +59,7 @@ if command -v fnm >/dev/null; then
 fi
 
 alias neofetch=fastfetch
+alias yt='mpv --no-video --cache=yes --demuxer-readahead-secs=20'
 
 # macOS (launchd) et les bureaux Linux fournissent déjà un agent. Sinon (tty, ssh): un seul
 # agent partagé par tous les shells, sur un socket fixe, au lieu d'un nouveau par shell.
