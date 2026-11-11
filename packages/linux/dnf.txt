@@ -81,6 +81,7 @@ fish
 fontforge
 fpaste
 fprintd-pam
+gdk-pixbuf2-modules-extra
 gfs2-utils
 gh
 gimp
