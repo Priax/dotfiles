@@ -25,6 +25,8 @@ dot pull       # git pull, repo → machine (l'existant est sauvegardé dans ~/d
 dot upgrade    # met tout à jour (voir plus bas)
 dot clean      # retire paquets inutilisés et caches (voir plus bas)
 dot defaults   # macOS: réglages système (packages/macos/defaults.sh), aussi lancé par dot install
+dot tablette   # Linux: compile et installe le correctif de la télécommande XP-Pen
+               # (à relancer si elle ne marche plus après un nouveau noyau)
 ```
 
 `dot upgrade`: paquets système (dnf + flatpak, ou brew), kitty et JetBrainsMono Nerd Font

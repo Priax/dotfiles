@@ -15,6 +15,11 @@
 ~/.config/ssh/common.conf
 
 ~/.config/nvim/
+
+# Tablette XP-Pen: assignations des boutons de la télécommande (et réglages souris / pavé tactile),
+# correctif HID-BPF de la télécommande ACK05, compilé et installé par « dot tablette »
+~/.config/kcminputrc        # linux
+~/src/hid-bpf-ack05/        # linux
 ~/.config/kitty/kitty.conf
 ~/.config/kitty/current-theme.conf
 ~/.config/kitty/macos.conf

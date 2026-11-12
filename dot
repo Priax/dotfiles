@@ -11,6 +11,7 @@
 #   dot upgrade   met tout à jour: paquets, toolchains, outils, police, nvim
 #   dot clean     retire paquets inutilisés et caches (re-téléchargés au besoin)
 #   dot defaults  macOS: applique les réglages système de packages/macos/defaults.sh
+#   dot tablette  Linux: compile et installe le correctif de la télécommande XP-Pen ACK05
 
 set -euo pipefail
 
@@ -23,7 +24,8 @@ set -euo pipefail
 REPO_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
 MANIFEST="$REPO_DIR/manifest"
 BACKUP_DIR="$HOME/dotfiles_backup/$(date +%Y%m%d_%H%M%S)"
-EXCLUDES=('*.bak' '*.save' '*.swp' '.git' 'fish_variables')
+# vmlinux.h, *.bpf.o: générés à la compilation du correctif de la tablette (dot tablette)
+EXCLUDES=('*.bak' '*.save' '*.swp' '.git' 'fish_variables' 'vmlinux.h' '*.bpf.o' '__pycache__')
 
 case "$(uname -s)" in
     Darwin) OS=macos ;;
@@ -808,6 +810,28 @@ install_nvim_deps() {
     fi
 }
 
+# Télécommande XP-Pen ACK05 (tablette Deco Pro XLW): le correctif HID-BPF de Fedora
+# (paquet udev-hid-bpf) ne se charge plus sur le noyau 7.3. Celui de ~/src/hid-bpf-ack05 est
+# recompilé contre le noyau en cours (/sys/kernel/btf/vmlinux), puis installé dans
+# /etc/udev-hid-bpf avec sa règle udev. À relancer si, après un redémarrage sur un nouveau noyau,
+# la télécommande retape ses raccourcis d'usine (onglet « Pavé » vide dans KDE).
+XPPEN_DIR="$HOME/src/hid-bpf-ack05"
+cmd_tablette() {
+    [[ $OS == linux ]] || die "dot tablette: Linux seulement"
+    [[ -f $XPPEN_DIR/Makefile ]] || die "$(pretty "$XPPEN_DIR") absent: « dot apply » d'abord"
+    info "Correctif de la télécommande XP-Pen (noyau $(uname -r))..."
+    sudo dnf install -y clang llvm bpftool make udev-hid-bpf || {
+        fail "  dépendances du correctif XP-Pen"
+        return
+    }
+    { make -C "$XPPEN_DIR" clean && make -C "$XPPEN_DIR" && sudo make -C "$XPPEN_DIR" install; } || {
+        fail "  correctif XP-Pen: échec de la compilation ou de l'installation"
+        return
+    }
+    sudo udevadm control --reload
+    ok "  installé: débrancher et rebrancher la télécommande (ou son dongle)"
+}
+
 # Entretien de la config nvim en headless (DOT_NVIM):
 #   install  plugins aux versions de lazy-lock.json, parsers et paquets Mason manquants
 #            (dot install, dot pull: la config tirée peut en déclarer de nouveaux)
@@ -1112,6 +1136,11 @@ cmd_upgrade() {
 
     info "nvim (plugins, parsers, paquets Mason)..."
     nvim_maint upgrade
+    # nouveau noyau installé: le correctif XP-Pen, compilé pour l'ancien, peut ne plus se charger
+    if [[ $OS == linux && -f /etc/udev-hid-bpf/0010-XPPen__ACK05.bpf.o ]] &&
+        [[ $(rpm -q --last kernel-core 2>/dev/null | head -1) != *"$(uname -r)"* ]]; then
+        info "Nouveau noyau: après le redémarrage, « dot tablette » si la télécommande XP-Pen ne marche plus."
+    fi
     ok "Terminé. lazy-lock.json a pu changer: « dot push » pour l'enregistrer."
 }
 
@@ -1330,6 +1359,9 @@ cmd_install() {
     info "nvim (plugins, parsers, paquets Mason)..."
     nvim_maint install
     [[ $OS == macos ]] && cmd_defaults
+    if [[ $OS == linux && -f $XPPEN_DIR/Makefile ]] && ask "Installer le correctif de la télécommande XP-Pen ?"; then
+        cmd_tablette
+    fi
 
     mkdir -p "$HOME/.local/bin"
     ln -sf "$REPO_DIR/dot" "$HOME/.local/bin/dot"
@@ -1368,6 +1400,7 @@ main() {
         upgrade) cmd_upgrade ;;
         clean) cmd_clean ;;
         defaults) cmd_defaults ;;
+        tablette) cmd_tablette ;;
         -h | --help | help) usage ;;
         *) usage 1 ;;
     esac

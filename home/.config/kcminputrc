@@ -1,0 +1,21 @@
+[ButtonRebinds][Tablet][Hanvon Ugee Shortcut Remote Keypad]
+0=Key,Tab
+1=Key,B
+10=Key,Ctrl+Shift+Z
+2=Key,E
+3=Key,M
+4=Key,Shift
+5=Key,Control
+6=Key,5
+7=Key,Ctrl+S
+8=Key,Ctrl+Z
+9=Key,Space
+
+[ButtonRebinds][TabletDial][Hanvon Ugee Shortcut Remote Keypad]
+0=Scroll
+
+[Libinput][1267][12796][ELAN0518:01 04F3:31FC Touchpad]
+Enabled=true
+
+[Tablet]
+SyncWithMouse=false
