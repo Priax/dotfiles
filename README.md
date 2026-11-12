@@ -65,7 +65,7 @@ passer à fish.
 
 Installe aussi:
 
-- les dépendances de la config nvim (go, npm, tree-sitter, ripgrep, ImageMagick, ffmpeg...);
+- les dépendances de la config nvim (go, npm, tree-sitter, ripgrep, fd, lazygit, ImageMagick, ffmpeg...);
 - par leur script officiel, ce qu'aucun gestionnaire de paquets ne suit: Rust (toutes les
   toolchains de `rustup.txt`, avec composants et cibles), Haskell via ghcup (versions
   recommandées du moment, + cabal-fmt en option), fnm (+ dernière LTS de Node), Deno,
@@ -80,7 +80,7 @@ nouvelle version sort (version notée dans `~/.local/share/fonts/JetBrainsMonoNe
 Sur Mac, c'est un cask: `brew upgrade`.
 
 Et pour nvim, à la fin: les plugins (versions de `lazy-lock.json`), les parsers treesitter et les
-paquets Mason, que faisaient `:MasonInstallAll` et `:TSInstallAll`. Vérification dans nvim:
+paquets Mason (LazyVim les installe aussi tout seul au premier lancement). Vérification dans nvim:
 `:checkhealth configs` (outils externes, paquets Mason, parsers).
 
 À refaire à la main (non suivi, volontairement): les clés SSH et les blocs `Host` de `~/.ssh/config`

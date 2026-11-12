@@ -72,6 +72,7 @@ eog
 f42-backgrounds-kde
 fastfetch
 fcitx5-chinese-addons
+fd-find
 fedora-bookmarks
 ffmpeg-devel
 filelight

@@ -16,7 +16,9 @@ local tools = {
     { { "npm" }, "paquets Mason npm (LSP web, prettier, mdx-analyzer)", true },
     { { "go" }, "paquets Mason go (gopls, goimports, delve)", true },
     { { "python3" }, "paquet Mason pypi (clang-format)", true },
-    { { "rg" }, "Telescope live_grep" },
+    { { "rg" }, "Snacks picker (grep)" },
+    { { "fd", "fdfind" }, "Snacks picker et explorateur (fichiers)" },
+    { { "lazygit" }, "<leader>gg (Snacks lazygit)" },
     { { "magick" }, "image.nvim" },
     { { "ffmpeg" }, "aperçu des vidéos (miniatures)" },
     { { "ffprobe" }, "aperçu des vidéos (infos)" },
@@ -80,7 +82,7 @@ local function check_parsers()
     if #missing == 0 then
         health.ok(("les %d parsers sont installés"):format(#wanted))
     else
-        health.error("manquants: " .. table.concat(missing, ", "), ":TSInstallAll")
+        health.error("manquants: " .. table.concat(missing, ", "), "relancer nvim (installés au démarrage) ou :TSUpdate")
     end
 end
 

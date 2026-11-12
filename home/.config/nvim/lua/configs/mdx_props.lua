@@ -1,7 +1,7 @@
 -- MDX: aide à la saisie des props des composants (via mdx-analyzer).
 -- Après `<Figure`: tous les champs restants en texte fantôme, retiré dès qu'on tape.
 -- Sur un nom de champ complet: sa doc dans une fenêtre flottante jusqu'au `=`.
--- <Tab> / <S-Tab>: sélectionne un champ fantôme (et affiche sa doc), <CR>: l'écrit (voir le mapping cmp dans plugins.lua).
+-- <Tab> / <S-Tab>: sélectionne un champ fantôme (et affiche sa doc), <CR>: l'écrit (voir le keymap blink.cmp dans plugins/completion.lua).
 
 local M = {}
 
@@ -331,6 +331,14 @@ local function current_ghost()
     return s, ghost
 end
 
+-- Y a-t-il des champs fantômes sous le curseur (selected: et l'un d'eux est-il sélectionné) ?
+-- blink.cmp appelle ses touches dans un mapping <expr>, où modifier le texte ou fermer une fenêtre
+-- est interdit (E565): le keymap teste ici, puis lance select / accept dans un vim.schedule
+function M.has_ghost(selected)
+    local _, ghost = current_ghost()
+    return ghost ~= nil and (not selected or ghost.sel ~= nil)
+end
+
 -- Sélectionne le champ fantôme suivant (dir = 1) ou précédent (dir = -1) ; false s'il n'y en a pas
 function M.select(dir)
     local s, ghost = current_ghost()
@@ -339,8 +347,8 @@ function M.select(dir)
     end
     local n = #ghost.props
     ghost.sel = ghost.sel and ((ghost.sel - 1 + dir) % n) + 1 or (dir > 0 and 1 or n)
-    if package.loaded.cmp then
-        require("cmp").close()
+    if package.loaded["blink.cmp"] then
+        require("blink.cmp").hide()
     end
     render_ghost(vim.api.nvim_get_current_buf(), ghost)
     show_ghost_doc(vim.api.nvim_get_current_buf(), s, ghost.props[ghost.sel])
@@ -363,7 +371,7 @@ function M.accept()
     close_doc(s)
     s.ghost = nil
     if item.insertTextFormat == 2 then
-        require("luasnip").lsp_expand(text .. " $0")
+        vim.snippet.expand(text .. " $0")
     else
         vim.api.nvim_put({ text .. " " }, "c", false, true)
     end

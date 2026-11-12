@@ -789,17 +789,22 @@ install_base() {
 # À garder en phase avec lua/configs/health.lua de nvim (:checkhealth configs signale un oubli).
 #   go, npm, python3: compilent / installent les paquets Mason (:MasonInstallAll)
 #   tree-sitter + compilateur C: parsers de nvim-treesitter (branche main)
-#   ripgrep: Telescope live_grep    ImageMagick: image.nvim    ffmpeg: aperçu des vidéos
+#   ripgrep, fd: Snacks picker et explorateur (LazyVim)    lazygit: <leader>gg
+#   ImageMagick: image.nvim    ffmpeg: aperçu des vidéos
 install_nvim_deps() {
     info "Dépendances de la config nvim..."
     if [[ $OS == macos ]]; then
         # compilateur C et python3: outils Xcode, installés avec Homebrew
-        brew install go node ripgrep tree-sitter-cli imagemagick ffmpeg
+        brew install go node ripgrep fd lazygit tree-sitter-cli imagemagick ffmpeg
     else
         # Chemins plutôt que noms de paquets: dnf choisit le fournisseur (ffmpeg-free de Fedora,
         # ou ffmpeg de RPM Fusion si le dépôt est configuré), le nom ne change pas d'une version à l'autre
         sudo dnf install -y golang /usr/bin/npm /usr/bin/python3 /usr/bin/tree-sitter gcc make unzip \
-            /usr/bin/rg /usr/bin/magick /usr/bin/ffmpeg /usr/bin/ffprobe /usr/bin/wl-copy
+            /usr/bin/rg /usr/bin/fd /usr/bin/magick /usr/bin/ffmpeg /usr/bin/ffprobe /usr/bin/wl-copy
+        # lazygit n'est pas dans les dépôts Fedora: compilé par go dans ~/go/bin (dans le PATH)
+        if ! have lazygit; then
+            go install github.com/jesseduffield/lazygit@latest || fail "  échec de lazygit"
+        fi
     fi
 }
 
@@ -869,8 +874,9 @@ local function wanted_parsers()
     return wanted
 end
 
--- paquets Mason voulus: ceux de :MasonInstallAll (configs/mason.lua: LSP activés, formatters, pkgs
--- de chadrc), plus ceux que le registre associe à un LSP activé (si la table de noms en oublie)
+-- paquets Mason voulus: ceux de :MasonInstallAll (configs/mason.lua: ensure_installed de mason.nvim
+-- et LSP déclarés à LazyVim), plus ceux que le registre associe à un LSP activé (si un LSP est
+-- activé hors des opts de nvim-lspconfig)
 local function wanted_mason(mr)
     local keep = {}
     for _, name in ipairs(require("configs.mason").wanted()) do
@@ -922,7 +928,8 @@ local ok, err = xpcall(function()
     local mr = mason_ready()
 
     if mode == "install" or mode == "upgrade" then
-        -- parsers d'ensure_installed absents (= :TSInstallAll); install() ajoute leurs dépendances
+        -- parsers d'ensure_installed absents (LazyVim les installe aussi au chargement du plugin,
+        -- mais sans attendre la fin); install() ajoute leurs dépendances
         local spec = require("lazy.core.config").plugins["nvim-treesitter"]
         local installed = ts.get_installed()
         local missing = vim.tbl_filter(function(lang)

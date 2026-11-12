@@ -1,15 +1,33 @@
 -- Paquets Mason: une seule source de vérité.
--- Le :MasonInstallAll de NvChad ne voit les LSP activés qu'une fois nvim-lspconfig chargé (event
--- « User FilePost », donc avec un fichier ouvert): lancé depuis un écran vide, comme sur une
--- machine neuve, il n'installait que les formatters. Ce qui déclare les paquets est donc chargé d'abord.
+-- LazyVim installe déjà ce qui manque au démarrage (mason.nvim pour les outils, mason-lspconfig
+-- pour les LSP). Ce module sert à connaître la liste complète (:checkhealth configs, dot clean)
+-- et à attendre la fin des installations en headless (dot install, dot pull).
 
 local M = {}
 
--- Paquets voulus: LSP activés (lspconfig.lua), formatters (conform.lua) et les pkgs de chadrc
--- pour ce que rien ne déclare (adaptateurs DAP), moins mason.skip
+-- Paquets voulus: ensure_installed de mason.nvim (LazyVim, extras, plugins/lsp.lua) et les LSP
+-- activés dans les opts de nvim-lspconfig que Mason sait installer
 function M.wanted()
-    require("lazy").load { plugins = { "nvim-lspconfig", "conform.nvim", "mason.nvim" } }
-    return require("nvchad.mason").get_pkgs()
+    require("lazy").load { plugins = { "mason.nvim", "nvim-lspconfig" } }
+    local wanted, seen = {}, {}
+    local function add(name)
+        if not seen[name] then
+            seen[name] = true
+            wanted[#wanted + 1] = name
+        end
+    end
+    for _, name in ipairs(LazyVim.opts("mason.nvim").ensure_installed or {}) do
+        add(name)
+    end
+    local packages = require("mason-lspconfig.mappings").get_mason_map().lspconfig_to_package
+    for server, opts in pairs(LazyVim.opts("nvim-lspconfig").servers or {}) do
+        local enabled = opts == true or (type(opts) == "table" and opts.enabled ~= false and opts.mason ~= false)
+        if enabled and packages[server] then
+            add(packages[server])
+        end
+    end
+    table.sort(wanted)
+    return wanted
 end
 
 -- Installe ce qui manque. on_start(nom) à chaque installation lancée, on_done(échecs) quand tout
@@ -34,26 +52,28 @@ function M.install_all(on_done, on_start)
                     on_start(name)
                 end
                 pending = pending + 1
-                pkg:install({ version = version ~= "" and version or nil }, function(success, err)
+                local function done(success, err)
                     if not success then
                         failed[#failed + 1] = name .. ": " .. tostring(err)
                     end
                     pending = pending - 1
                     finish()
-                end)
+                end
+                if pkg:is_installing() then
+                    -- déjà lancée par LazyVim au chargement de mason.nvim / nvim-lspconfig
+                    pkg:once("install:success", function()
+                        done(true)
+                    end)
+                    pkg:once("install:failed", function(err)
+                        done(false, err)
+                    end)
+                else
+                    pkg:install({ version = version ~= "" and version or nil }, done)
+                end
             end
         end
         finish()
     end)
 end
-
--- NvChad définit cette commande dans un vim.schedule (ui/lua/nvchad/init.lua), donc après cette config:
--- cette définition, mise en file plus tard (ordre FIFO), passe après et la remplace
-vim.schedule(function()
-    vim.api.nvim_create_user_command("MasonInstallAll", function()
-        vim.cmd "Mason"
-        M.install_all()
-    end, { desc = "Installer les paquets Mason de la config (LSP, formatters, DAP)" })
-end)
 
 return M
