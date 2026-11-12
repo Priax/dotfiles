@@ -30,6 +30,10 @@ return {
                 cssls = {},
                 marksman = {},
 
+                -- biome est installé par Mason comme formatter (plugins/formatting.lua), et
+                -- mason-lspconfig active d'office tout LSP installé: pas de serveur biome en plus
+                biome = { enabled = false },
+
                 eslint = {
                     -- useFlatConfig only when the project has an eslint.config.*, otherwise
                     -- .eslintrc projects fail with "Could not find config file"

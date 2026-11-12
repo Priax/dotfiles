@@ -25,6 +25,7 @@ biosdevname
 bluedevil
 bluez-cups
 boost-devel
+bpftool
 breeze-icon-theme-fedora
 brltty
 busybox
@@ -33,6 +34,7 @@ caca-utils
 ccache
 ceres-solver-devel
 cifs-utils
+clang
 clean-rpm-gpg-pubkey
 coccinelle
 colord-kde
@@ -189,6 +191,7 @@ libuuid-devel
 libva-intel-driver
 libva-intel-media-driver
 livesys-scripts
+llvm
 ltrace
 lv2-rubberband-plugins
 mactel-boot
