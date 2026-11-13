@@ -17,8 +17,16 @@ return {
         },
     },
     -- « catppuccin-nvim » et pas « catppuccin »: Neovim 0.12 embarque son propre catppuccin.vim,
-    -- qui passe avant celui du plugin (sans ses réglages ni ses intégrations)
-    { "LazyVim/LazyVim", opts = { colorscheme = "catppuccin-nvim" } },
+    -- qui passe avant celui du plugin (sans ses réglages ni ses intégrations).
+    -- Thème par défaut; le dernier choisi est repris au démarrage (configs/colorscheme.lua)
+    {
+        "LazyVim/LazyVim",
+        opts = {
+            colorscheme = function()
+                require("configs.colorscheme").load()
+            end,
+        },
+    },
 
     -- K: noice traite la réponse de chaque serveur LSP à part, et notifie « No information
     -- available » pour chacun de ceux qui n'ont rien à dire (astro, render-markdown à côté

@@ -68,3 +68,4 @@ vim.api.nvim_create_user_command("MasonInstallAll", function()
 end, { desc = "Installer les paquets Mason de la config (LSP, formatters, DAP)" })
 
 require "configs.video_preview"
+require("configs.colorscheme").setup()
