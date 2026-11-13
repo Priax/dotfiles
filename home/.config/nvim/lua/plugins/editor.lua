@@ -1,10 +1,10 @@
 return {
-    -- ; sert au mode commande (config/keymaps.lua), répéter f/t passe sur <leader>;
+    -- flash ne prend pas ; (mode commande, config/keymaps.lua): retaper f/t répète le saut
     {
         "folke/flash.nvim",
         opts = {
             modes = {
-                char = { keys = { "f", "F", "t", "T", [";"] = "<leader>;", "," } },
+                char = { keys = { "f", "F", "t", "T", "," } },
             },
         },
     },

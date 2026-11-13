@@ -3,13 +3,8 @@
 
 local map = vim.keymap.set
 
--- ; passe en mode commande. Celui de flash.nvim (répéter f/t) est sur <leader>; (plugins/editor.lua)
+-- ; passe en mode commande. Pour répéter f/t, on retape f/t (flash.nvim, plugins/editor.lua)
 map("n", ";", ":", { desc = "Mode commande" })
-
--- rangé avec les diagnostics (<leader>x), <leader>q étant le groupe « quit » de LazyVim
-map("n", "<leader>xd", function()
-    vim.diagnostic.setqflist()
-end, { desc = "Diagnostics dans la quickfix" })
 
 map("n", "<leader>o", function()
     -- dans l'explorateur, on prend le fichier sélectionné. Dans un picker ou un terminal, le

@@ -46,7 +46,8 @@ check_secrets() {
     if [[ -n $hits ]]; then
         git -C "$REPO_DIR" reset -q
         warn "Ce qui ressemble à un secret a été détecté, commit annulé:"
-        printf '%s\n' "$hits" | cut -c1-80 >&2
+        # masqué, comme le fait gitleaks: le terminal peut être partagé ou enregistré
+        sed -E "s/$pattern/[secret masqué]/g" <<<"$hits" | cut -c1-100 >&2
         exit 1
     fi
     # gitleaks connaît bien plus de formats que les motifs ci-dessus
