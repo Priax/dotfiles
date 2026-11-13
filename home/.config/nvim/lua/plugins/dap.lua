@@ -1,9 +1,10 @@
 -- nvim-dap, dap-ui, les raccourcis <leader>d… et les adaptateurs (codelldb, delve) viennent des
--- extras dap.core, lang.clangd, lang.rust (rustaceanvim: <leader>dr) et lang.go (nvim-dap-go)
+-- extras dap.core, lang.clangd, lang.rust (<leader>dr) et lang.go.
 return {
     {
         "mfussenegger/nvim-dap",
-        -- après l'extra lang.clangd, qui demande le chemin de l'exécutable à la main
+        -- remplace les configurations de l'extra lang.clangd, qui demandent le chemin de
+        -- l'exécutable au clavier
         opts = function()
             local dap = require "dap"
             local utils = require "dap.utils"
@@ -18,7 +19,7 @@ return {
                     end,
                     cwd = "${workspaceFolder}",
                     stopOnEntry = false,
-                    -- découpe en respectant les guillemets ("a b" reste un seul argument)
+                    -- "a b" reste un seul argument
                     args = function()
                         return utils.splitstr(vim.fn.input "Program arguments: ")
                     end,

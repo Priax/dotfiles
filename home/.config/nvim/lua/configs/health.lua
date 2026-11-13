@@ -1,12 +1,12 @@
--- :checkhealth configs: ce dont cette config a besoin hors de nvim, et ce qu'elle doit avoir
--- installé (paquets Mason, parsers). Les outils sont installés par « dot install »
--- (install_nvim_deps et install_tools): garder les deux listes en phase.
+-- :checkhealth configs vérifie les outils externes, les paquets Mason et les parsers.
+-- Les outils sont installés par dot install (install_nvim_deps, install_tools): garder les deux
+-- listes en phase.
 
 local M = {}
 local health = vim.health
 local is_mac = vim.fn.has "mac" == 1
 
--- { exécutable(s) (un seul suffit), à quoi il sert, manquant = erreur (true) ou avertissement }
+-- { exécutables (un seul suffit), à quoi il sert, true si son absence est une erreur }
 local tools = {
     { { "git" }, "lazy.nvim, Mason", true },
     { { "curl" }, "Mason, nvim-treesitter, image.nvim", true },

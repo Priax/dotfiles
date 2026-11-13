@@ -1,7 +1,7 @@
--- Thèmes en plus de catppuccin (plugins/ui.lua) et tokyonight (fourni par LazyVim): ceux de
--- NvChad qui existent en plugin. Chargés seulement quand on les choisit (<leader>uC les liste
--- quand même). Variantes claires: :set bg=light pour gruvbox, onedark, vscode, everforest…
--- `name`: plusieurs dépôts s'appellent « vim » ou « nvim »
+-- Les thèmes de NvChad qui existent en plugin, en plus de catppuccin (plugins/ui.lua) et
+-- tokyonight (LazyVim). Ils ne se chargent que quand on les choisit, <leader>uC les liste tous.
+-- Variantes claires: :set bg=light pour gruvbox, onedark, vscode, everforest…
+-- `name` quand le dépôt s'appelle juste « vim » ou « nvim ».
 
 local themes = {
     { "rebelot/kanagawa.nvim" }, -- kanagawa, -wave, -dragon, -lotus

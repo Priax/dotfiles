@@ -1,23 +1,23 @@
--- Chargé avant lazy.nvim. Options par défaut de LazyVim:
+-- Chargé avant lazy.nvim. Les options par défaut de LazyVim:
 -- https://github.com/LazyVim/LazyVim/blob/main/lua/lazyvim/config/options.lua
 
 local opt = vim.opt
 local o = vim.o
 
--- Indentation à 4 au lieu de 2
+-- indentation à 4 (LazyVim met 2)
 o.shiftwidth = 4
 o.tabstop = 4
 o.softtabstop = 4
 
--- Numéros de ligne absolus (<leader>uL pour basculer)
+-- numéros absolus, <leader>uL pour basculer
 o.relativenumber = false
 
--- ligne affichée sur la colonne du dernier caractère voulu
-opt.colorcolumn = "69"
+-- repère à 80 colonnes (norme Epitech)
+opt.colorcolumn = "80"
 
--- show invisible caracters
+-- caractères invisibles
 opt.listchars = { tab = "» ", trail = "·", nbsp = "␣" }
 
--- .mdx (blog): nvim ne connaît pas l'extension, coloration markdown
+-- .mdx (blog): nvim ne connaît pas l'extension, on le colore comme du markdown
 vim.filetype.add { extension = { mdx = "mdx" } }
 vim.treesitter.language.register("markdown", "mdx")

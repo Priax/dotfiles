@@ -1,11 +1,12 @@
--- MDX: aide à la saisie des props des composants (via mdx-analyzer).
--- Après `<Figure`: tous les champs restants en texte fantôme, retiré dès qu'on tape.
--- Sur un nom de champ complet: sa doc dans une fenêtre flottante jusqu'au `=`.
--- <Tab> / <S-Tab>: sélectionne un champ fantôme (et affiche sa doc), <CR>: l'écrit (voir le keymap blink.cmp dans plugins/completion.lua).
+-- MDX: aide à écrire les props des composants, avec mdx-analyzer.
+-- Après `<Figure `, les props pas encore écrites s'affichent en texte fantôme jusqu'à la
+-- frappe suivante. <Tab> / <S-Tab> en sélectionnent une et montrent sa doc, <CR> l'écrit
+-- (touches définies dans plugins/completion.lua).
+-- Sur un nom de prop complet, sa doc reste affichée jusqu'au `=`.
 
 local M = {}
 
--- Fichier du projet Astro qui déclare les composants du blog et le type de leurs props
+-- fichier du blog (projet Astro) qui déclare les composants et le type de leurs props
 local PROPS_FILE = "src/components/blog/props.ts"
 
 local ns = vim.api.nvim_create_namespace "mdx_props"
@@ -14,8 +15,8 @@ local failed = {} -- "id du client:composant" -> vim.uv.now() après 5 essais sa
 local FAILED_TTL = 10000 -- ms avant de redemander un composant en échec
 local state = {} -- buf -> { tick, win, doc_key, ghost, last }
 
--- Les props viennent du code des composants: cache vidé quand ce code a pu changer
--- (enregistré dans nvim, ou de retour dans nvim après un git pull dans le terminal)
+-- Cache vidé quand le code des composants a pu changer: enregistré dans nvim, ou modifié
+-- ailleurs (git pull dans un terminal) avant de revenir dans nvim
 local function reset_cache()
     props_cache, failed = {}, {}
 end
@@ -30,7 +31,8 @@ local function mdx_client(buf)
     return vim.lsp.get_clients({ bufnr = buf, name = "mdx_analyzer" })[1]
 end
 
--- Balise ouverte sous le curseur: nom du composant, mode ("tagname" | "space" | "name" | "value") et attributs déjà écrits
+-- Balise ouverte sous le curseur: nom du composant, attributs déjà écrits, et où on en est
+-- (mode: "tagname", "space", "name" ou "value")
 local function parse_tag(buf, row, col)
     local lines = vim.api.nvim_buf_get_lines(buf, math.max(0, row - 10), row + 1, false)
     lines[#lines] = lines[#lines]:sub(1, col)
@@ -76,7 +78,7 @@ local function position(buf, row, col)
     }
 end
 
--- Clé de cache par serveur: deux projets peuvent avoir un composant du même nom
+-- une clé par serveur, deux projets peuvent avoir un composant du même nom
 local function cache_key(client, name)
     return client.id .. ":" .. name
 end
@@ -86,7 +88,7 @@ local function fetch_props(buf, client, row, col, name, callback, on_fail)
     if props_cache[key] then
         return callback(props_cache[key])
     end
-    -- Composant sans props (ou inconnu): pas de nouvelle série de requêtes à chaque frappe
+    -- composant sans props ou inconnu: on ne redemande pas à chaque frappe
     if failed[key] and vim.uv.now() - failed[key] < FAILED_TTL then
         return
     end
@@ -100,7 +102,7 @@ local function fetch_props(buf, client, row, col, name, callback, on_fail)
         for _, item in ipairs(result.items or result) do
             local prop = item.label:gsub("%?$", "")
             local is_field = item.kind == 5 or item.kind == 10
-            -- Noms de composants en majuscule: la requête est tombée sur le nom de balise, pas sur les props
+            -- un nom en majuscule est un composant: la requête est tombée sur le nom de balise
             if is_field and prop:match "^%u" then
                 return on_fail()
             end
@@ -110,7 +112,7 @@ local function fetch_props(buf, client, row, col, name, callback, on_fail)
             end
         end
         if #props == 0 then
-            -- réponse non vide mais sans props: le serveur est prêt, le composant n'en a pas
+            -- si la réponse n'est pas vide, le serveur est prêt et le composant n'a pas de props
             return on_fail(#(result.items or result) > 0)
         end
         props_cache[key] = props
@@ -118,10 +120,10 @@ local function fetch_props(buf, client, row, col, name, callback, on_fail)
     end, buf)
 end
 
--- Noms des props d'un composant, lus dans PROPS_FILE (nil si composant inconnu)
+-- Noms des props d'un composant d'après PROPS_FILE, nil si le composant est inconnu
 local props_ts = {}
 function M.prop_names(buf, name)
-    local root = vim.fs.root(buf, "astro.config.mjs")
+    local root = vim.fs.root(buf, { "astro.config.mjs", "astro.config.ts", "astro.config.js" })
     if not root then
         return nil
     end
@@ -203,7 +205,8 @@ local function show_ghost(buf, s, row, col, tag, props, prefix)
     render_ghost(buf, s.ghost)
 end
 
--- Exemple de valeur tiré du type: premier littéral différent du défaut, sinon selon le type
+-- Exemple de valeur d'après le type: le premier littéral qui n'est pas la valeur par défaut,
+-- sinon une valeur selon le type
 local function example(name, detail, doc)
     local typ = detail:match "%?*: (.*)$" or ""
     local default = doc:match "%*@default%*%s*```%s*(.-)%s*```"
@@ -279,7 +282,7 @@ local function update(buf, retry)
         return close_doc(s)
     end
 
-    -- Juste après le nom, les props se demandent après l'espace du ` />` ajouté
+    -- juste après le nom, on interroge le serveur après l'espace du ` />` ajouté
     local line = vim.api.nvim_get_current_line()
     if tag.mode == "tagname" and line:sub(col + 1, col + 1) ~= " " then
         return close_doc(s)
@@ -302,8 +305,8 @@ local function update(buf, retry)
         end
         close_doc(s)
     end, function(no_props)
-        -- Serveur pas encore prêt (réponse vide): on redemande un peu plus tard.
-        -- Après 5 essais, si le serveur a bien répondu, le composant n'a pas de props
+        -- Réponse vide: le serveur démarre encore, on redemande un peu plus tard.
+        -- Après 5 essais, si le serveur a répondu, c'est que le composant n'a pas de props.
         if s.retry >= 5 then
             if no_props then
                 failed[cache_key(client, tag.name)] = vim.uv.now()
@@ -331,15 +334,16 @@ local function current_ghost()
     return s, ghost
 end
 
--- Y a-t-il des champs fantômes sous le curseur (selected: et l'un d'eux est-il sélectionné) ?
--- blink.cmp appelle ses touches dans un mapping <expr>, où modifier le texte ou fermer une fenêtre
--- est interdit (E565): le keymap teste ici, puis lance select / accept dans un vim.schedule
+-- Y a-t-il des props fantômes sous le curseur (et, avec selected, l'une est-elle sélectionnée) ?
+-- blink.cmp appelle ses touches dans un mapping <expr>, où on ne peut ni modifier le texte ni
+-- fermer une fenêtre (E565). Les touches testent donc ici, puis lancent select / accept dans un
+-- vim.schedule.
 function M.has_ghost(selected)
     local _, ghost = current_ghost()
     return ghost ~= nil and (not selected or ghost.sel ~= nil)
 end
 
--- Sélectionne le champ fantôme suivant (dir = 1) ou précédent (dir = -1) ; false s'il n'y en a pas
+-- Sélectionne la prop suivante (dir = 1) ou précédente (dir = -1), false s'il n'y en a pas
 function M.select(dir)
     local s, ghost = current_ghost()
     if not ghost then
@@ -355,7 +359,7 @@ function M.select(dir)
     return true
 end
 
--- Écrit le champ fantôme sélectionné ; false si aucun n'est sélectionné
+-- Écrit la prop sélectionnée, false si aucune ne l'est
 function M.accept()
     local s, ghost = current_ghost()
     if not ghost or not ghost.sel then
@@ -364,7 +368,7 @@ function M.accept()
     local item = ghost.props[ghost.sel].item
     local text = (item.insertText or item.label:gsub("%?$", "")):gsub("'", '"')
     if ghost.prefix ~= "" then
-        -- Juste après le nom: on passe l'espace du ` />` pour écrire le champ après
+        -- juste après le nom, on écrit après l'espace du ` />`
         vim.api.nvim_win_set_cursor(0, { ghost.row + 1, ghost.col + 1 })
     end
     clear(vim.api.nvim_get_current_buf())
@@ -389,7 +393,7 @@ function M.attach(buf)
         group = group,
         buffer = buf,
         callback = function()
-            -- Une frappe déclenche CursorMovedI et TextChangedI: une seule mise à jour par état
+            -- une frappe déclenche CursorMovedI et TextChangedI, on ne met à jour qu'une fois
             local s = state[buf]
             local cursor = vim.api.nvim_win_get_cursor(0)
             local key = vim.b[buf].changedtick .. ":" .. cursor[1] .. ":" .. cursor[2]

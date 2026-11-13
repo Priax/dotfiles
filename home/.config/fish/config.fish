@@ -1,9 +1,10 @@
-# Environment (mirrors ~/.bashrc)
+# Même environnement que ~/.config/env.sh (bash, sh, zsh), à garder en phase
 set -gx GOPATH ~/go
 set -gx BUN_INSTALL ~/.bun
 set -gx EDITOR nvim
+set -gx NPM_CONFIG_PREFIX ~/.local
 
-# Défini ici plutôt que dans fish_variables (état local, non versionné)
+# ici plutôt que dans fish_variables, qui n'est pas suivi
 set -g fish_greeting 'Stay silly !! <3'
 
 # macOS: Homebrew (absent sur Linux)
@@ -15,7 +16,7 @@ fish_add_path -g ~/.local/bin ~/bin $BUN_INSTALL/bin ~/.ghcup/bin ~/.deno/bin ~/
 fish_add_path -g -a $GOPATH/bin ~/.cabal/bin
 
 if status is-interactive
-    # Node version manager: falls back to system node when no version is selected
+    # fnm: change de version de Node selon le .nvmrc du dossier (--use-on-cd)
     if type -q fnm
         fnm env --use-on-cd --shell fish | source
     end
@@ -25,6 +26,7 @@ if status is-interactive
 
     # macOS (launchd) et les bureaux Linux fournissent déjà un agent. Sinon (tty, ssh): un seul
     # agent partagé par tous les shells, sur un socket fixe, au lieu d'un nouveau par shell.
+    # Les clés y sont ajoutées à leur première utilisation (AddKeysToAgent, ~/.config/ssh/common.conf).
     if not set -q SSH_AUTH_SOCK
         set -gx SSH_AUTH_SOCK ~/.ssh/agent.sock
         ssh-add -l >/dev/null 2>&1
@@ -32,7 +34,6 @@ if status is-interactive
         if test $status -eq 2
             rm -f $SSH_AUTH_SOCK
             ssh-agent -a $SSH_AUTH_SOCK >/dev/null
-            test -f ~/.ssh/tsinghua_gitlab; and ssh-add ~/.ssh/tsinghua_gitlab 2>/dev/null
         end
     end
 end

@@ -1,5 +1,5 @@
--- Pas l'extra lang.haskell de LazyVim: il tire LuaSnip et des paquets Mason (hlint,
--- haskell-debug-adapter) alors que hls, fourmolu et cabal-fmt viennent de ghcup / dot install
+-- Pas d'extra lang.haskell: il ajoute LuaSnip et des paquets Mason (hlint, haskell-debug-adapter),
+-- alors qu'ici hls, fourmolu et cabal-fmt viennent de ghcup et de dot install.
 return {
     {
         "mrcjkb/haskell-tools.nvim",

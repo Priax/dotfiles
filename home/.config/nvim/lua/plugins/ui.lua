@@ -1,7 +1,7 @@
 return {
-    -- Même thème que kitty (current-theme.conf), mais avec les fonds du thème decay de NvChad.
-    -- Le fond de Catppuccin Mocha (#1e1e2e) est exactement celui de kitty, qui rend alors ces
-    -- cellules transparentes (background_opacity 0.70): le fond d'écran passait à travers nvim
+    -- Même thème que kitty, avec les fonds du thème decay de NvChad. Le fond de Catppuccin
+    -- Mocha (#1e1e2e) est exactement celui de kitty, qui rend alors ces cases transparentes
+    -- (background_opacity 0.70): on voyait le fond d'écran à travers nvim.
     {
         "catppuccin/nvim",
         name = "catppuccin",
@@ -16,9 +16,9 @@ return {
             },
         },
     },
-    -- « catppuccin-nvim » et pas « catppuccin »: Neovim 0.12 embarque son propre catppuccin.vim,
-    -- qui passe avant celui du plugin (sans ses réglages ni ses intégrations).
-    -- Thème par défaut; le dernier choisi est repris au démarrage (configs/colorscheme.lua)
+    -- Le dernier thème choisi est repris au démarrage (configs/colorscheme.lua). Par défaut,
+    -- « catppuccin-nvim » et pas « catppuccin »: Neovim 0.12 a son propre catppuccin.vim, qui
+    -- passerait avant celui du plugin, sans ses réglages ni ses intégrations.
     {
         "LazyVim/LazyVim",
         opts = {
@@ -28,12 +28,12 @@ return {
         },
     },
 
-    -- K: noice traite la réponse de chaque serveur LSP à part, et notifie « No information
-    -- available » pour chacun de ceux qui n'ont rien à dire (astro, render-markdown à côté
-    -- de mdx_analyzer…), même quand un autre a affiché la doc
+    -- Sur K, noice traite chaque serveur LSP à part et affiche « No information available »
+    -- pour chacun de ceux qui n'ont rien à dire (astro, render-markdown à côté de
+    -- mdx_analyzer…), même quand un autre a affiché la doc.
     { "folke/noice.nvim", opts = { lsp = { hover = { silent = true } } } },
 
-    -- Écran d'accueil sans le logo LazyVim: le menu et le temps de démarrage seulement
+    -- accueil sans le logo LazyVim
     {
         "folke/snacks.nvim",
         opts = {
@@ -43,9 +43,9 @@ return {
                     { section = "startup" },
                 },
             },
-            -- Largeur de l'arbre de fichiers, en colonnes (40 par défaut)
+            -- arbre de fichiers plus étroit (40 colonnes par défaut)
             picker = { sources = { explorer = { layout = { layout = { width = 25 } } } } },
-            -- cacher le terminal avec les touches qui l'ouvrent (config/keymaps.lua)
+            -- les touches qui ouvrent un terminal (config/keymaps.lua) le cachent
             terminal = {
                 win = {
                     keys = {

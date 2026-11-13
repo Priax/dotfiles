@@ -1,5 +1,5 @@
--- Thème persistant: le dernier thème appliqué (<leader>uC, :colorscheme, :set bg=…) est repris
--- au prochain démarrage. Nom et fond (dark / light) dans un fichier de stdpath("state")
+-- Retient le dernier thème (<leader>uC, :colorscheme, :set bg=…) pour le prochain démarrage.
+-- Le nom et le fond (dark / light) sont écrits dans stdpath("state")/colorscheme.
 
 local M = {}
 
@@ -12,7 +12,7 @@ function M.load()
     if ok and (lines[2] == "dark" or lines[2] == "light") then
         vim.o.background = lines[2]
     end
-    -- thème désinstallé ou cassé: on retombe sur celui par défaut
+    -- thème désinstallé ou cassé
     if not pcall(vim.cmd.colorscheme, name) then
         vim.o.background = "dark"
         vim.cmd.colorscheme(default)
@@ -23,7 +23,7 @@ function M.setup()
     vim.api.nvim_create_autocmd("ColorScheme", {
         group = vim.api.nvim_create_augroup("UserColorschemePersist", { clear = true }),
         callback = function(args)
-            -- args.match: le nom passé à :colorscheme (g:colors_name peut différer)
+            -- le nom passé à :colorscheme (g:colors_name peut être différent)
             pcall(vim.fn.writefile, { args.match, vim.o.background }, file)
         end,
     })

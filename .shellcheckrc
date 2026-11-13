@@ -1,0 +1,3 @@
+# shellcheck (dot push, check_scripts): les « # shellcheck source=lib/….sh » de dot sont
+# relatifs à dot lui-même
+source-path=SCRIPTDIR

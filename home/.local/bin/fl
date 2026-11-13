@@ -20,10 +20,10 @@
 #   FL_VERSION          version à lancer si plusieurs sont installées (ex: 2025), vide = la plus récente
 #   FL_ASIO_INPUT       micro choisi pour FL si aucun ne l'est (défaut: micro du laptop), vide = ne rien faire
 #
-# À chaque lancement et après chaque `fl install`, le script remet aussi en place ce qui ne dépend
-# pas de la version: l'entrée de menu « FL Studio » (qui passe par fl), la désactivation des
-# faux ports MIDI PipeWire (sinon « Le pilote n'a pas été activé » à chaque démarrage), et le
-# micro du laptop comme entrée de FL (sinon le casque Bluetooth passe en mode appel).
+# À chaque lancement, fl remet en place: l'entrée de menu « FL Studio » (qui passe par fl), les
+# faux ports MIDI PipeWire désactivés (sinon « Le pilote n'a pas été activé » à chaque démarrage)
+# et le micro du laptop comme entrée de FL (sinon le casque Bluetooth passe en mode appel).
+# `fl install` ne refait que l'entrée de menu.
 
 set -uo pipefail
 
@@ -52,7 +52,7 @@ need_wine() {
     command -v wine >/dev/null || die "wine introuvable: sudo dnf install wine"
 }
 
-# Piège classique: WINEPREFIX pointé sur .../drive_c crée un préfixe vide dans le préfixe
+# Un WINEPREFIX qui pointe sur .../drive_c crée un préfixe vide dans le préfixe
 check_prefix() {
     case "$WINEPREFIX" in
         */drive_c|*/drive_c/) die "WINEPREFIX pointe sur drive_c: il doit pointer sur le dossier parent ($WINEPREFIX)" ;;
@@ -76,9 +76,13 @@ find_fl_exe() {
 # déclarent la même classe de fenêtre (fl64.exe), et KDE y rattacherait la fenêtre de FL au lieu
 # de l'icône épinglée, ce qui fait deux icônes dans la barre des tâches.
 sync_desktop() {
-    local size icon f
+    local size icon candidate f
     for size in 16 20 24 32 40 48 64 256; do
-        icon="$(ls -t "$ICONS_DIR/${size}x${size}/apps/"*_FL64.0.png 2>/dev/null | head -n1)"
+        # icône la plus récente (celle de la dernière version installée)
+        icon=""
+        for candidate in "$ICONS_DIR/${size}x${size}/apps/"*_FL64.0.png; do
+            [[ -f "$candidate" && ( -z "$icon" || "$candidate" -nt "$icon" ) ]] && icon="$candidate"
+        done
         [[ -n "$icon" ]] && cp -f "$icon" "$ICONS_DIR/${size}x${size}/apps/fl-studio.png"
     done
 
@@ -126,9 +130,11 @@ disable_fake_midi() {
         # user.reg double les antislashs; le bloc va de l'en-tête à la ligne vide suivante
         block="$(H="[${key//\\/\\\\}]" awk 'index($0, ENVIRON["H"]) == 1 { f = 1; next } f && /^$/ { exit } f' "$WINEPREFIX/user.reg" 2>/dev/null)"
         grep -qx '"Enabled"="0"' <<<"$block" && continue
-        wine reg add "HKCU\\$key" /v Enabled /t REG_SZ /d 0 /f >/dev/null 2>&1 \
-            && info "Port MIDI factice désactivé: $port" \
-            || warn "Impossible de désactiver le port MIDI $port"
+        if wine reg add "HKCU\\$key" /v Enabled /t REG_SZ /d 0 /f >/dev/null 2>&1; then
+            info "Port MIDI factice désactivé: $port"
+        else
+            warn "Impossible de désactiver le port MIDI $port"
+        fi
     done
 }
 
@@ -151,9 +157,11 @@ set_default_asio_input() {
         warn "Micro « $FL_ASIO_INPUT » introuvable dans Wine: choisis l'entrée à la main dans FL (Show ASIO panel)"
         return 0
     fi
-    wine reg add 'HKCU\Software\Image-Line\ASIO' /v inputEndPoint /t REG_SZ /d "{0.0.1.00000000}.$guid" /f >/dev/null 2>&1 \
-        && info "Entrée FL Studio ASIO réglée sur « $FL_ASIO_INPUT »" \
-        || warn "Impossible de régler l'entrée FL Studio ASIO"
+    if wine reg add 'HKCU\Software\Image-Line\ASIO' /v inputEndPoint /t REG_SZ /d "{0.0.1.00000000}.$guid" /f >/dev/null 2>&1; then
+        info "Entrée FL Studio ASIO réglée sur « $FL_ASIO_INPUT »"
+    else
+        warn "Impossible de régler l'entrée FL Studio ASIO"
+    fi
 }
 
 find_waves_server() {
@@ -169,18 +177,22 @@ setup_input_remap() {
         warn "Entrée $FL_INPUT_MASTER absente (interface débranchée ?), pas de remap"
         return 0
     fi
-    pactl load-module module-remap-source \
+    if pactl load-module module-remap-source \
         source_name="$REMAP_NAME" master="$FL_INPUT_MASTER" channels=2 \
-        master_channel_map="$FL_INPUT_CHANNELS" channel_map=front-left,front-right >/dev/null \
-        && info "Entrée stéréo $REMAP_NAME créée ($FL_INPUT_CHANNELS)" \
-        || warn "Échec du remap de $FL_INPUT_MASTER"
+        master_channel_map="$FL_INPUT_CHANNELS" channel_map=front-left,front-right >/dev/null; then
+        info "Entrée stéréo $REMAP_NAME créée ($FL_INPUT_CHANNELS)"
+    else
+        warn "Échec du remap de $FL_INPUT_MASTER"
+    fi
 }
 
 set_quantum() {
     [[ "$FL_QUANTUM" == 0 ]] && return 0
-    pw-metadata -n settings 0 clock.force-quantum "$FL_QUANTUM" >/dev/null 2>&1 \
-        && info "Quantum PipeWire forcé à $FL_QUANTUM" \
-        || warn "Impossible de forcer le quantum PipeWire"
+    if pw-metadata -n settings 0 clock.force-quantum "$FL_QUANTUM" >/dev/null 2>&1; then
+        info "Quantum PipeWire forcé à $FL_QUANTUM"
+    else
+        warn "Impossible de forcer le quantum PipeWire"
+    fi
 }
 
 reset_quantum() {

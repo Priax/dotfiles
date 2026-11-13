@@ -1,6 +1,6 @@
 # .bash_profile
 
-# Get the aliases and functions (PATH setup lives in .bashrc)
+# Tout est dans .bashrc (et ~/.config/env.sh pour le PATH)
 if [ -f ~/.bashrc ]; then
     . ~/.bashrc
 fi

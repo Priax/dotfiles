@@ -1,10 +1,10 @@
--- Formatage à la sauvegarde: géré par LazyVim (vim.g.autoformat, <leader>uf pour basculer,
--- <leader>cf pour formater), avec repli sur le LSP quand aucun formatter n'est déclaré
+-- LazyVim formate à la sauvegarde (<leader>uf pour couper, <leader>cf à la main), et se rabat
+-- sur le LSP quand aucun formatter n'est déclaré pour le langage.
 return {
     {
         "stevearc/conform.nvim",
-        -- fonction et pas table: lazy.nvim fusionnerait les listes index par index
-        -- (go = { "goimports", "gofumpt" } de l'extra garderait gofumpt)
+        -- une fonction plutôt qu'une table: lazy fusionnerait les listes élément par élément, et
+        -- le go = { "goimports", "gofumpt" } de l'extra garderait gofumpt
         opts = function(_, opts)
             opts.formatters = opts.formatters or {}
             opts.formatters.biome = {

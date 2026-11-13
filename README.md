@@ -1,58 +1,68 @@
 # dotfiles
 
-Config perso (Fedora et macOS): bash, fish, git, nvim, kitty, docker, postgresql…
+Ma config sur Fedora et macOS: bash, fish, git, nvim, kitty, docker, postgresql…
 
 ## Organisation
 
 ```
-manifest     liste des fichiers suivis (une ligne = un fichier ou dossier/)
-dot          script de synchro
-home/        miroir de ~        (ex: home/.config/fish/config.fish)
-system/      miroir de /, sudo  (ex: system/etc/docker/daemon.json)
-firefox/     miroir du profil Firefox par défaut (ex: firefox/chrome/userChrome.css)
-packages/    listes de paquets par OS: linux/ (dnf, flatpak…), macos/ (brew…)
+manifest     les fichiers suivis, un par ligne (dossier si la ligne finit par /)
+dot          le script de synchro
+lib/         son code: common, sync, packages, install, nvim (+ nvim_maint.lua), upgrade, clean
+home/        copie de ~           (ex: home/.config/fish/config.fish)
+system/      copie de /, en sudo  (ex: system/etc/docker/daemon.json)
+firefox/     copie du profil Firefox par défaut (ex: firefox/chrome/userChrome.css)
+packages/    listes de paquets: linux/ (dnf, flatpak…), macos/ (brew…)
 ```
 
 ## Utilisation
 
 ```sh
-dot status     # qu'est-ce qui a changé ?
-dot diff fish  # voir le détail (filtre optionnel)
+dot status     # ce qui a changé
+dot diff fish  # le détail, filtré sur « fish »
 dot push       # machine → repo, commit, push
-dot pull       # git pull, repo → machine (l'existant est sauvegardé dans ~/dotfiles_backup/),
-               # puis plugins nvim (lazy-lock.json), parsers et paquets Mason manquants;
-               # refuse d'écraser un fichier modifié sur la machine: dot push d'abord
-dot upgrade    # met tout à jour (voir plus bas)
-dot clean      # retire paquets inutilisés et caches (voir plus bas)
-dot defaults   # macOS: réglages système (packages/macos/defaults.sh), aussi lancé par dot install
-dot tablette   # Linux: compile et installe le correctif de la télécommande XP-Pen
-               # (à relancer si elle ne marche plus après un nouveau noyau)
+dot pull       # git pull, puis repo → machine et plugins nvim
+dot upgrade    # met tout à jour
+dot clean      # fait de la place
+dot defaults   # macOS: réglages système (aussi lancé par dot install)
+dot tablette   # Linux: correctif de la télécommande XP-Pen, à relancer après un nouveau noyau
+               # si elle ne marche plus
 ```
 
-`dot upgrade`: paquets système (dnf + flatpak, ou brew), kitty et JetBrainsMono Nerd Font
-si une nouvelle version est sortie, toolchains Rust et outils cargo, Haskell (versions
-recommandées par ghcup), dernière LTS de Node (fnm), paquets npm globaux, Deno, et
-dans nvim: plugins (`lazy-lock.json` change: `dot push` ensuite), parsers treesitter, paquets Mason.
+`dot pull` sauvegarde dans `~/dotfiles_backup/` ce qu'il remplace. Il refuse d'écraser un fichier
+modifié sur la machine: il faut d'abord le pousser avec `dot push`. Ensuite il installe les plugins
+nvim aux versions de `lazy-lock.json`, et les parsers et paquets Mason qui manquent.
 
-`dot clean`: vide sans demander les caches, re-téléchargés au besoin (dnf/brew, npm, yarn, pip,
-go, cargo, ghcup, miniatures, logs de nvim). Tout ce qui est *déduit* est listé puis confirmé:
-paquets devenus inutiles (dnf/brew autoremove), store cabal des GHC désinstallés, parsers et
-paquets Mason hors de la config nvim (peut-être installés à la main), versions inactives de
-GHC/HLS/cabal/stack (laissées par `dot upgrade`), versions de Node sans alias fnm, journaux système,
-corbeille, images Docker/Podman, sauvegardes de `dot apply` de plus de 30 jours. Les plugins retirés de la config nvim partent sans demander
-(lazy le déduit de la config elle-même).
+`dot upgrade` met à jour les paquets système (dnf et flatpak, ou brew), kitty, lazygit et
+JetBrainsMono Nerd Font, Rust et les outils cargo, Haskell (versions recommandées par ghcup), Node (dernière LTS
+via fnm), les paquets npm globaux, Deno, et dans nvim les plugins, parsers et paquets Mason. Si
+`lazy-lock.json` a changé, il faut ensuite faire `dot push`.
 
-Les dossiers du manifest sont des miroirs dans les deux sens: `dot apply` retire aussi de la machine
-ce qui n'est plus dans le repo (après sauvegarde), sauf les fichiers exclus (`fish_variables`…).
+`dot clean` vide sans demander les caches, qui se re-téléchargent (dnf/brew, npm, yarn, pip, go,
+cargo, ghcup, miniatures, logs de nvim), et retire les plugins sortis de la config nvim. Pour le
+reste, il montre ce qu'il compte supprimer et demande:
 
-Le repo est public: `dot push` annule le commit si un secret est détecté, avec ses propres motifs et
-`gitleaks`.
+- paquets devenus inutiles (`dnf autoremove`, `brew autoremove`);
+- versions de GHC, HLS, cabal et stack inactives, et stores cabal des GHC désinstallés;
+- versions de Node qu'aucun alias fnm ni `.nvmrc` n'utilise;
+- parsers et paquets Mason absents de la config nvim;
+- journaux système, corbeille, images Docker/Podman;
+- sauvegardes de `dot apply` de plus de 30 jours.
 
-Suivre un nouveau fichier: l'ajouter dans `manifest`, puis `dot push`.
-Entrée propre à un OS: ajouter `# linux` ou `# macos` en fin de ligne dans `manifest`.
-Même fichier du repo à un autre emplacement selon l'OS: `destination < source`
-(ex: `~/Library/Fonts/Daydream.ttf < ~/.local/share/fonts/Daydream.ttf  # macos`).
-Fichier du profil Firefox: `firefox:chemin` (le dossier du profil est retrouvé via `profiles.ini`).
+Les dossiers du manifest sont copiés en miroir dans les deux sens: `dot apply` retire aussi de la
+machine ce qui n'est plus dans le repo (après sauvegarde), sauf les fichiers exclus comme
+`fish_variables`.
+
+Le repo est public. `dot push` annule le commit s'il trouve un secret (ses propres motifs, puis
+`gitleaks`). Il passe aussi les scripts à `shellcheck` et demande confirmation si quelque chose
+ressort.
+
+## Le manifest
+
+- Suivre un nouveau fichier: l'ajouter au manifest, puis `dot push`.
+- Fichier propre à un OS: `# linux` ou `# macos` en fin de ligne.
+- Fichier du repo posé ailleurs sur une machine: `destination < source`, par exemple
+  `~/Library/Fonts/Daydream.ttf < ~/.local/share/fonts/Daydream.ttf  # macos`.
+- Fichier du profil Firefox: `firefox:chemin`, le dossier du profil est retrouvé dans `profiles.ini`.
 
 ## Nouvelle machine
 
@@ -60,40 +70,34 @@ Fichier du profil Firefox: `firefox:chemin` (le dossier du profil est retrouvé 
 curl -fsSL https://raw.githubusercontent.com/Priax/dotfiles/main/bootstrap.sh | bash
 ```
 
-Même commande sur Fedora et sur macOS. Installe git, rsync, gitleaks, fish, nvim, kitty et
-JetBrainsMono Nerd Font (sur Mac: Homebrew d'abord, puis bash et rsync récents),
-déploie les configs, propose d'installer les paquets de `packages/<os>/` et de
-passer à fish.
+Même commande sur Fedora et macOS (sur Mac, Homebrew est installé d'abord). Le script installe:
 
-Installe aussi:
+- git, rsync, gitleaks, shellcheck, fish, nvim, kitty et JetBrainsMono Nerd Font;
+- ce dont la config nvim a besoin (go, npm, tree-sitter, ripgrep, fd, lazygit, ImageMagick,
+  ffmpeg…);
+- lazygit, depuis sa release GitHub (absent des dépôts Fedora);
+- par leur script officiel: Rust (les toolchains de `rustup.txt`), Haskell via ghcup (+ cabal-fmt
+  si on veut), fnm et la dernière LTS de Node, Deno, et kitty sur Linux;
+- les paquets npm globaux de `npm-global.txt`, dans `~/.local` (sans sudo, voir
+  `NPM_CONFIG_PREFIX` dans `~/.config/env.sh`);
+- les dépôts dnf de `dnf-repos.txt` (RPM Fusion, docker-ce, pgAdmin4), puis les paquets de
+  `packages/<os>/`, après confirmation;
+- sur Linux, l'ajout au groupe `pipewire` pour l'audio temps réel (après reconnexion,
+  `ulimit -r` doit afficher 70).
 
-- les dépendances de la config nvim (go, npm, tree-sitter, ripgrep, fd, lazygit, ImageMagick, ffmpeg...);
-- par leur script officiel, ce qu'aucun gestionnaire de paquets ne suit: Rust (toutes les
-  toolchains de `rustup.txt`, avec composants et cibles), Haskell via ghcup (versions
-  recommandées du moment, + cabal-fmt en option), fnm (+ dernière LTS de Node), Deno,
-  et kitty sur Linux;
-- les dépôts dnf tiers de `dnf-repos.txt` (RPM Fusion, docker-ce, pgAdmin4), avant les paquets;
-- les paquets npm globaux de `npm-global.txt` (npm du système, pas celui de fnm);
-- sur Linux, l'ajout au groupe `pipewire` (priorité temps réel pour l'audio, effective à la
-  prochaine connexion: `ulimit -r` doit afficher 70).
+Il déploie les configs, prépare nvim (plugins, parsers, paquets Mason) et propose de passer à fish.
+Pour vérifier nvim ensuite: `:checkhealth configs`.
 
-JetBrainsMono Nerd Font: sur Linux, `dot install` et `dot pull` la mettent à jour quand une
-nouvelle version sort (version notée dans `~/.local/share/fonts/JetBrainsMonoNerdFont/.version`).
-Sur Mac, c'est un cask: `brew upgrade`.
+Pas suivi, à refaire à la main:
 
-Et pour nvim, à la fin: les plugins (versions de `lazy-lock.json`), les parsers treesitter et les
-paquets Mason (LazyVim les installe aussi tout seul au premier lancement). Vérification dans nvim:
-`:checkhealth configs` (outils externes, paquets Mason, parsers).
-
-À refaire à la main (non suivi, volontairement): les clés SSH et les blocs `Host` de `~/.ssh/config`
-(les réglages communs, eux, sont dans `~/.config/ssh/common.conf`, que `dot apply` inclut en tête de
-`~/.ssh/config`), les clés GPG
-(`~/.gnupg`, à copier depuis l'ancienne machine ou via `gpg --export-secret-keys` / `gpg --import`)
-et `~/.gitconfig.local` (réglages propres à la machine, ex: git-lfs sur le Mac).
+- les clés SSH et les blocs `Host` de `~/.ssh/config` (les réglages communs sont dans
+  `~/.config/ssh/common.conf`, inclus par `dot apply`);
+- les clés GPG: copier `~/.gnupg`, ou `gpg --export-secret-keys` puis `gpg --import`;
+- `~/.gitconfig.local`, pour ce qui est propre à une machine (git-lfs sur le Mac).
 
 ## Applis à installer soi-même
 
-Ni paquet ni installeur scriptable, à récupérer sur leur site:
+Ni paquet ni installeur scriptable:
 
 - Aseprite
 - Soulseek
@@ -103,12 +107,12 @@ Ni paquet ni installeur scriptable, à récupérer sur leur site:
 - Vesktop
 - VirtualBox
 - Olympus
-- FL Studio (installeur de l'archive Image-Line (forum, "FL Studio Installer
-  Archive"), puis `fl install <installeur.exe>`. Ensuite débloquer avec le compte Image-Line, réinstaller
-  les plugins tiers (Waves Central: `fl install`).
+- FL Studio: prendre l'installeur dans l'archive Image-Line (forum, « FL Studio Installer
+  Archive »), puis `fl install <installeur.exe>`. Ensuite, débloquer avec le compte Image-Line et
+  réinstaller les plugins tiers (Waves Central, aussi avec `fl install`).
 
 Installées par `dnf.txt`, mais leurs données ne sont pas suivies:
 
-- Steam: se reconnecter, les jeux sont à retélécharger (ou copier `~/.local/share/Steam/steamapps`).
-- Krita: réglages, brosses et ressources à reconfigurer (ou copier `~/.local/share/krita` et
+- Steam: se reconnecter et retélécharger les jeux (ou copier `~/.local/share/Steam/steamapps`).
+- Krita: réglages, brosses et ressources à refaire (ou copier `~/.local/share/krita` et
   `~/.config/kritarc`).

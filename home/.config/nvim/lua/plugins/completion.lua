@@ -2,16 +2,17 @@ return {
     {
         "saghen/blink.cmp",
         opts = function(_, opts)
-            -- Tronque la colonne signature du menu pour laisser la place à la doc
+            -- colonne de la signature plus étroite, pour laisser de la place à la doc
             opts.completion = vim.tbl_deep_extend("force", opts.completion or {}, {
                 menu = { draw = { components = { label_description = { width = { max = 30 } } } } },
                 documentation = { window = { max_width = 80 } },
             })
 
-            -- .mdx: <Tab> / <S-Tab> parcourent les champs fantômes, <CR> écrit celui sélectionné.
-            -- Hors de là, les touches du preset « enter » de LazyVim
+            -- Dans un .mdx, <Tab> / <S-Tab> parcourent les props fantômes et <CR> écrit celle
+            -- sélectionnée. Ailleurs, ce sont les touches habituelles de LazyVim.
             local mdx_props = require "configs.mdx_props"
-            -- mapping <expr>: on teste tout de suite, l'action est différée (voir mdx_props.has_ghost)
+            -- blink appelle ces fonctions dans un mapping <expr>, où on ne peut pas modifier le
+            -- buffer: on teste tout de suite et on reporte l'action (vim.schedule)
             local function ghost(selected, action)
                 return function()
                     if not mdx_props.has_ghost(selected) then

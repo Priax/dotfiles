@@ -8,6 +8,8 @@
 ~/.zprofile                # macos
 ~/.zshenv                  # macos
 ~/.config/fish/
+# PATH, EDITOR…: lu par .bashrc et .profile
+~/.config/env.sh
 
 ~/.gitconfig
 ~/.config/git/ignore

@@ -1,7 +1,6 @@
--- Les serveurs déclarés ici sont installés par Mason (mason-lspconfig) et activés par LazyVim.
--- Viennent des extras: vtsls (lang.typescript), gopls (lang.go), clangd (lang.clangd),
--- rust-analyzer (lang.rust, via rustaceanvim et rustup), la base d'eslint (linting.eslint,
--- qui corrige aussi à la sauvegarde). hls est lancé par haskell-tools (plugins/haskell.lua).
+-- Les serveurs déclarés ici sont installés par Mason et activés par LazyVim. D'autres viennent
+-- des extras: vtsls, gopls, clangd, rust-analyzer (par rustaceanvim, installé avec rustup) et
+-- eslint (qui corrige aussi à la sauvegarde). hls est lancé par haskell-tools (plugins/haskell.lua).
 
 local eslint_flat_config_files = {
     "eslint.config.js",
@@ -16,13 +15,12 @@ return {
     {
         "neovim/nvim-lspconfig",
         opts = function(_, opts)
-            -- configs de nvim-lspconfig (lsp/<nom>.lua), lues avant que LazyVim n'y fusionne celles-ci:
-            -- un before_init déclaré ici remplace le leur, il doit donc l'appeler
+            -- Les configs de nvim-lspconfig (lsp/<nom>.lua), lues avant que LazyVim y ajoute
+            -- celles d'ici. Un before_init déclaré ici remplace le leur, il doit donc l'appeler.
             local eslint_default = vim.lsp.config.eslint or {}
             local mdx_default = vim.lsp.config.mdx_analyzer or {}
 
-            -- Types et noms de paramètres en gris dans le code: éteints au démarrage,
-            -- <leader>uh les affiche / les cache
+            -- types et noms de paramètres en gris dans le code: cachés, <leader>uh pour les voir
             opts.inlay_hints.enabled = false
 
             opts.servers = vim.tbl_deep_extend("force", opts.servers or {}, {
@@ -30,13 +28,13 @@ return {
                 cssls = {},
                 marksman = {},
 
-                -- biome est installé par Mason comme formatter (plugins/formatting.lua), et
-                -- mason-lspconfig active d'office tout LSP installé: pas de serveur biome en plus
+                -- biome est installé pour le formatage (plugins/formatting.lua), et
+                -- mason-lspconfig démarre tout LSP installé: on ne veut pas de son serveur
                 biome = { enabled = false },
 
                 eslint = {
-                    -- useFlatConfig only when the project has an eslint.config.*, otherwise
-                    -- .eslintrc projects fail with "Could not find config file"
+                    -- useFlatConfig seulement si le projet a un eslint.config.*, sinon les projets
+                    -- en .eslintrc échouent (« Could not find config file »)
                     before_init = function(params, config)
                         if eslint_default.before_init then
                             eslint_default.before_init(params, config)
@@ -56,10 +54,10 @@ return {
                     end,
                 },
 
-                -- goimports seul au formatage, pas gofumpt (plugins/formatting.lua)
+                -- goimports seul, pas gofumpt (plugins/formatting.lua)
                 gopls = { settings = { gopls = { gofumpt = false } } },
 
-                -- typescript.enabled: sans ça, mdx-analyzer ne fait ni survol (K) ni complétion des composants
+                -- sans typescript.enabled, pas de survol (K) ni de complétion des composants
                 mdx_analyzer = {
                     init_options = { typescript = { enabled = true } },
                     before_init = function(params, config)
@@ -67,8 +65,8 @@ return {
                         if mdx_default.before_init then
                             mdx_default.before_init(params, config)
                         end
-                        -- hors projet, chemin vide et le serveur plante (« Can't find typescript.js »):
-                        -- repli sur le TypeScript embarqué par vtsls (Mason)
+                        -- hors d'un projet, le chemin est vide et le serveur plante (« Can't find
+                        -- typescript.js »): on prend le TypeScript fourni avec vtsls
                         local ts = config.init_options.typescript
                         if not ts.tsdk or ts.tsdk == "" then
                             ts.tsdk = vim.fn.stdpath "data"
@@ -77,8 +75,9 @@ return {
                     end,
                 },
 
-                -- Astro, seulement pour le frontmatter des .mdx (contentIntellisense: schémas de
-                -- .astro/collections/, générés si experimental.contentIntellisense est activé)
+                -- Astro, seulement pour le frontmatter des .mdx. contentIntellisense lit les
+                -- schémas de .astro/collections/, générés quand le projet active
+                -- experimental.contentIntellisense.
                 astro = {
                     filetypes = { "mdx" },
                     root_dir = function(bufnr, on_dir)
@@ -93,14 +92,13 @@ return {
         end,
     },
 
-    -- Ce qu'aucun extra ne déclare: les formatters de plugins/formatting.lua
-    -- (stylua, goimports, codelldb et delve viennent de LazyVim et de ses extras)
+    -- Les formatters de plugins/formatting.lua qu'aucun extra n'installe
     {
         "mason-org/mason.nvim",
         opts = function(_, opts)
             vim.list_extend(opts.ensure_installed, { "biome", "prettier", "clang-format" })
-            -- codelldb est déclaré par lang.rust et lang.clangd: sans dédoublonnage, LazyVim lance
-            -- deux fois son installation et Mason plante (« Package is already installing »)
+            -- codelldb est demandé par lang.rust et par lang.clangd. En double, LazyVim lance deux
+            -- installations et Mason plante (« Package is already installing »).
             opts.ensure_installed = LazyVim.dedup(opts.ensure_installed)
         end,
     },

@@ -1,5 +1,5 @@
 return {
-    -- `;` sert à entrer en mode commande (config/keymaps.lua): la répétition de f/t passe sur <leader>;
+    -- ; sert au mode commande (config/keymaps.lua), répéter f/t passe sur <leader>;
     {
         "folke/flash.nvim",
         opts = {
@@ -9,7 +9,7 @@ return {
         },
     },
 
-    -- Gx.nvim (Ouvrir le lien ou fichier sous le curseur avec 'gx')
+    -- gx ouvre le lien ou le fichier sous le curseur
     {
         "chrishrb/gx.nvim",
         keys = { { "gx", "<cmd>Browse<cr>", mode = { "n", "x" } } },

@@ -22,25 +22,21 @@ require("lazy").setup({
     { import = "plugins" },
   },
   defaults = {
-    -- By default, only LazyVim plugins will be lazy-loaded. Your custom plugins will load during startup.
-    -- If you know what you're doing, you can set this to `true` to have all your custom plugins lazy-loaded by default.
+    -- mes plugins se chargent au démarrage, sauf s'ils précisent ft, cmd, keys…
     lazy = false,
-    -- It's recommended to leave version=false for now, since a lot the plugin that support versioning,
-    -- have outdated releases, which may break your Neovim install.
-    version = false, -- always use the latest git commit
-    -- version = "*", -- try installing the latest stable version for plugins that support semver
+    -- dernier commit plutôt que dernière release (souvent vieille), les versions sont figées
+    -- par lazy-lock.json
+    version = false,
   },
   install = { colorscheme = { "catppuccin-nvim", "habamax" } },
-  -- Seul image.nvim déclare un rock (magick), mais il utilise le CLI ImageMagick (magick_cli).
-  -- Sans ça, hererocks s'installe sur Linux et pas sur Mac, et lazy-lock.json diffère.
+  -- Seul image.nvim déclare un rock (magick), dont il n'a pas besoin: il passe par la commande
+  -- magick. Sans ça, hererocks s'installe sur Linux et pas sur Mac, et lazy-lock.json diffère.
   rocks = { enabled = false },
-  checker = {
-    enabled = true, -- check for plugin updates periodically
-    notify = false, -- notify on update
-  }, -- automatically check for plugin updates
+  -- Pas de vérification en tâche de fond: les mises à jour passent par « dot upgrade »
+  checker = { enabled = false },
   performance = {
     rtp = {
-      -- disable some rtp plugins
+      -- plugins fournis avec nvim, inutiles ici
       disabled_plugins = {
         "gzip",
         -- "matchit",

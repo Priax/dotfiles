@@ -3,17 +3,17 @@
 
 local map = vim.keymap.set
 
--- `;` de flash.nvim (répéter f/t) est déplacé sur <leader>; (plugins/editor.lua)
-map("n", ";", ":", { desc = "CMD enter command mode" })
-map("i", "jk", "<ESC>", { desc = "Quitter le mode insertion" })
+-- ; passe en mode commande. Celui de flash.nvim (répéter f/t) est sur <leader>; (plugins/editor.lua)
+map("n", ";", ":", { desc = "Mode commande" })
 
--- <leader>q est le groupe « quit » de LazyVim: rangé avec les diagnostics (<leader>x)
+-- rangé avec les diagnostics (<leader>x), <leader>q étant le groupe « quit » de LazyVim
 map("n", "<leader>xd", function()
     vim.diagnostic.setqflist()
-end, { desc = "Diagnostics to quickfix" })
+end, { desc = "Diagnostics dans la quickfix" })
 
 map("n", "<leader>o", function()
-    -- explorateur, picker, terminal…: le nom du buffer n'est pas un fichier
+    -- dans l'explorateur, on prend le fichier sélectionné. Dans un picker ou un terminal, le
+    -- nom du buffer n'est pas un fichier.
     local file = vim.fn.expand "%:p"
     if vim.bo.filetype == "snacks_picker_list" then
         local explorer = Snacks.picker.get({ source = "explorer" })[1]
@@ -30,9 +30,9 @@ map("n", "<leader>o", function()
     end
 end, { desc = "Ouvrir le fichier avec l'application système" })
 
--- Terminaux: le <C-/> de LazyVim est inutilisable en AZERTY (« / » = Maj + « : », et la touche
--- arrive comme « : »). Mêmes touches que sous NvChad; dans un terminal, elles le cachent
--- (plugins/ui.lua). 1 = celui de <C-/> et <leader>ft
+-- Terminaux. Le <C-/> de LazyVim ne marche pas en AZERTY, où / se tape avec Maj. On reprend
+-- les touches de NvChad, qui cachent aussi le terminal quand on est dedans (plugins/ui.lua).
+-- Le terminal 1 est le même que celui de <C-/> et <leader>ft.
 for key, term in pairs {
     ["<A-h>"] = { count = 1, position = "bottom", desc = "Terminal en bas" },
     ["<A-v>"] = { count = 2, position = "right", desc = "Terminal à droite" },
@@ -49,8 +49,8 @@ for key, term in pairs {
     end, { desc = term.desc })
 end
 
--- AZERTY: « [ » et « ] » demandent AltGr (AltGr 5 et AltGr )). « ç » et « à », voisines et
--- libres en mode normal, les remplacent comme préfixes: çd / àd = [d / ]d, çh / àh, çb / àb…
--- remap: toute la famille [x / ]x suit (LazyVim, plugins, natifs), which-key compris
+-- AZERTY: [ et ] demandent AltGr. ç et à, côte à côte et libres en mode normal, les remplacent:
+-- çd / àd = [d / ]d, çh / àh, çb / àb… Avec remap, tous les [x / ]x suivent (LazyVim, plugins,
+-- natifs), which-key compris.
 map({ "n", "x", "o" }, "ç", "[", { remap = true, desc = "Préfixe [ (précédent)" })
 map({ "n", "x", "o" }, "à", "]", { remap = true, desc = "Préfixe ] (suivant)" })

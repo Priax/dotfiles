@@ -1,10 +1,11 @@
--- Chargé après les autocmds de LazyVim (groupes préfixés par `lazyvim_`):
+-- Chargé après les autocmds de LazyVim (groupes en `lazyvim_`):
 -- https://github.com/LazyVim/LazyVim/blob/main/lua/lazyvim/config/autocmds.lua
 
 local autocmd = vim.api.nvim_create_autocmd
 local augroup = vim.api.nvim_create_augroup
 
--- LazyVim active wrap + spell (anglais) dans les fichiers texte: on ne garde que wrap
+-- LazyVim active wrap et spell (en anglais) dans les fichiers texte. On garde seulement wrap,
+-- en réutilisant le nom de son groupe pour remplacer son autocmd.
 autocmd("FileType", {
     group = augroup("lazyvim_wrap_spell", { clear = true }),
     pattern = { "text", "plaintex", "typst", "gitcommit", "markdown", "mdx" },
@@ -17,15 +18,13 @@ autocmd("FileType", {
     group = augroup("UserFileType", { clear = true }),
     pattern = "*",
     callback = function()
-        -- j: retire le commentaire si la ligne devient vide après un join
-        -- o: retire l'auto-commentaire après 'o' ou 'O'
-        -- r: retire l'auto-commentaire après <Enter> en mode insertion
-        vim.opt_local.formatoptions:remove { "r", "o", "j" }
+        -- pas de commentaire prolongé automatiquement par <Entrée> (r) ni par o / O (o)
+        vim.opt_local.formatoptions:remove { "r", "o" }
     end,
 })
 
--- .mdx / .md: pas de ' auto-fermant (apostrophes du français).
--- Le mapping local au buffer passe avant celui, global, de mini.pairs
+-- Markdown et MDX: ' ne se ferme pas tout seul, à cause des apostrophes du français.
+-- Un mapping local au buffer passe avant celui de mini.pairs.
 autocmd("FileType", {
     group = augroup("UserNoQuotePair", { clear = true }),
     pattern = { "mdx", "markdown" },
@@ -34,7 +33,7 @@ autocmd("FileType", {
     end,
 })
 
--- MDX: champs fantômes des props (mdx_props) et fermeture automatique des balises (mdx_autoclose)
+-- MDX: props proposées en texte fantôme et balises fermées automatiquement
 autocmd("FileType", {
     group = augroup("UserMdx", { clear = true }),
     pattern = "mdx",
@@ -44,8 +43,8 @@ autocmd("FileType", {
     end,
 })
 
--- Les fenêtres flottantes de nvim-dap (<leader>dw…) prennent le focus sans moyen de les fermer:
--- q / <Esc> les ferment, et elles se ferment seules quand on en sort
+-- Les fenêtres flottantes de nvim-dap (<leader>dw…) prennent le focus et rien ne les ferme.
+-- Ici, q et <Esc> les ferment, et elles se ferment aussi quand on en sort.
 autocmd("FileType", {
     group = augroup("DapFloat", { clear = true }),
     pattern = "dap-float",

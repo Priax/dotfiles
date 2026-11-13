@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # Installation sur une nouvelle machine (Fedora ou macOS):
 #   curl -fsSL https://raw.githubusercontent.com/Priax/dotfiles/main/bootstrap.sh | bash
-# ou, si le repo est déjà cloné : ./bootstrap.sh
+# ou, si le repo est déjà cloné: ./bootstrap.sh
 
 set -euo pipefail
 
-# Sur une machine neuve, aucune clé SSH n'est encore liée à GitHub : on clone
-# en HTTPS (public, sans authentification) et on garde SSH pour les push.
+# Une machine neuve n'a pas encore de clé SSH liée à GitHub: on clone en HTTPS (le repo est
+# public) et on garde SSH pour les push.
 REPO_URL="${DOTFILES_REPO:-https://github.com/Priax/dotfiles.git}"
 REPO_DIR="${DOTFILES_DIR:-$HOME/delivery/dotfiles}"
 
@@ -17,7 +17,7 @@ REPO_DIR="${DOTFILES_DIR:-$HOME/delivery/dotfiles}"
 
 # Avec « curl | bash », stdin est le pipe: les questions doivent lire le terminal.
 if [[ $(uname -s) == Darwin ]]; then
-    # dot a besoin de bash 4+ et de rsync récent, que macOS ne fournit pas: Homebrew d'abord.
+    # dot a besoin de bash 4+ et d'un rsync récent, que macOS ne fournit pas: Homebrew d'abord
     find_brew() {
         local b
         for b in /opt/homebrew/bin/brew /usr/local/bin/brew; do
@@ -44,5 +44,5 @@ if [[ ! -d $REPO_DIR/.git ]]; then
     git -C "$REPO_DIR" remote set-url --push origin git@github.com:Priax/dotfiles.git
 fi
 
-# bash du PATH: celui de Homebrew sur Mac (le /bin/bash 3.2 de macOS ne suffit pas)
+# le bash du PATH, donc celui de Homebrew sur Mac (le /bin/bash de macOS est en 3.2)
 exec bash "$REPO_DIR/dot" install </dev/tty

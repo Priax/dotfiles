@@ -1,6 +1,5 @@
--- Aperçu des vidéos dans nvim: infos (ffprobe) + planche de miniatures (ffmpeg),
--- affichée via image.nvim, au lieu d'ouvrir le binaire.
--- Dans le buffer: `o` ouvre la vidéo avec le lecteur par défaut.
+-- Ouvrir une vidéo dans nvim affiche ses infos (ffprobe) et une planche de miniatures (ffmpeg,
+-- image.nvim) au lieu du binaire. `o` l'ouvre dans le lecteur par défaut.
 
 local exts = { "mp4", "mkv", "webm", "mov", "avi", "m4v", "flv", "wmv" }
 local cache_dir = vim.fn.stdpath "cache" .. "/video-thumbs"
@@ -24,7 +23,7 @@ local function fmt_size(b)
     return string.format("%.1f %s", b, units[i])
 end
 
--- vim.system lève une erreur si l'exécutable n'existe pas (ffmpeg absent sur une autre machine)
+-- vim.system lève une erreur si l'exécutable n'existe pas
 local function system(cmd, opts, on_exit)
     if vim.fn.executable(cmd[1]) == 0 then
         return nil
@@ -48,7 +47,7 @@ local function probe(file)
     if not job then
         return nil
     end
-    -- bloquant: on attend au plus 3 s (fichier sur un montage réseau lent)
+    -- bloquant, au plus 3 s (pour un fichier sur un montage réseau lent)
     local res = job:wait(3000)
     local ok, data = pcall(vim.json.decode, res.stdout or "")
     if not ok or not data then
@@ -74,9 +73,9 @@ local function probe(file)
     }
 end
 
--- Planche 3x3: une image au milieu de chaque neuvième de la vidéo. Un `-ss` avant chaque `-i`
--- saute directement à l'instant voulu, au lieu de décoder toute la vidéo avec le filtre fps
--- (0,6 s au lieu de 13 s pour 10 min en 720p, et indépendant de la durée).
+-- Planche 3x3: une image au milieu de chaque neuvième de la vidéo. Un -ss avant chaque -i
+-- saute directement au bon instant, sans décoder toute la vidéo comme le filtre fps
+-- (0,6 s au lieu de 13 s pour 10 min en 720p).
 local function thumb_cmd(file, duration, thumb)
     local cmd = { "ffmpeg", "-v", "error", "-y" }
     local filters, inputs = {}, {}
@@ -108,7 +107,7 @@ local function show_thumb(buf, thumb, y)
     end
     local win = vim.fn.bufwinid(buf)
     if win == -1 then
-        -- buffer quitté pendant la génération: on affichera au prochain BufWinEnter
+        -- buffer quitté pendant la génération, on affichera au prochain BufWinEnter
         pending[buf] = { thumb = thumb, y = y }
         return
     end
@@ -134,7 +133,7 @@ vim.api.nvim_create_autocmd("BufReadCmd", {
         local file = vim.fn.fnamemodify(args.file, ":p")
         local info = probe(file) or { duration = 0, lines = { "  (ffprobe absent ou en échec)", "" } }
 
-        -- `:e` relance BufReadCmd: on retire l'ancienne image
+        -- :e relance BufReadCmd, on retire l'ancienne image
         if images[buf] then
             images[buf]:clear()
             images[buf] = nil
@@ -163,7 +162,7 @@ vim.api.nvim_create_autocmd("BufReadCmd", {
         -- miniature en cache, invalidée si le fichier change
         local mtime = (vim.uv.fs_stat(file) or {}).mtime or { sec = 0 }
         local thumb = string.format("%s/%s.png", cache_dir, vim.fn.sha256(file .. mtime.sec))
-        -- y est indexé à 0: on ancre l'image sur la dernière ligne (vide)
+        -- y commence à 0: l'image se place sur la dernière ligne, vide
         local y = #info.lines - 1
 
         if vim.uv.fs_stat(thumb) then
