@@ -12,7 +12,7 @@
 9=Key,Space
 
 [ButtonRebinds][TabletDial][Hanvon Ugee Shortcut Remote Keypad]
-0=Scroll
+0=AxisKey,Ctrl+=,Ctrl+-,120
 
 [Libinput][1267][12796][ELAN0518:01 04F3:31FC Touchpad]
 Enabled=true
