@@ -67,7 +67,7 @@ check_scripts() {
         warn "shellcheck absent, scripts non vérifiés (dnf install ShellCheck, ou brew install shellcheck)"
         return 0
     fi
-    (cd "$REPO_DIR" && shellcheck -x dot bootstrap.sh home/.local/bin/fl) && return 0
+    (cd "$REPO_DIR" && shellcheck -x dot bootstrap.sh home/.local/bin/fl home/.local/bin/krita-bureau) && return 0
     ask "shellcheck signale des problèmes (ci-dessus). Pousser quand même ?" ||
         die "push annulé: corrige, puis « dot push »"
 }

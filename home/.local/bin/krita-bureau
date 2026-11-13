@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# krita-bureau [n]: va sur le bureau virtuel n (4 par défaut) avec Krita.
+# Krita ouvert: ses fenêtres sont amenées sur ce bureau et mises au premier plan.
+# Krita fermé: il est lancé sur ce bureau.
+# Lancé par un bouton de la télécommande XP-Pen, via un raccourci KDE (voir l'aide-mémoire).
+
+set -euo pipefail
+
+n=${1:-4}
+[[ $n =~ ^[1-9][0-9]*$ ]] || { echo "usage: krita-bureau [numéro du bureau]" >&2; exit 1; }
+qdbus=$(command -v qdbus-qt6 || command -v qdbus6 || command -v qdbus) || {
+    echo "qdbus introuvable (paquet qt6-qttools)" >&2
+    exit 1
+}
+
+# Le déplacement passe par un script KWin, seul moyen sous Wayland de toucher aux fenêtres
+# des autres applications
+js="$(mktemp --suffix=.js)"
+trap 'rm -f "$js"' EXIT
+cat >"$js" <<EOF
+const desks = workspace.desktops;
+const target = desks[Math.min($n, desks.length) - 1];
+workspace.currentDesktop = target;
+for (const w of workspace.windowList()) {
+    if (w.resourceClass !== "krita") continue;
+    w.desktops = [target];
+    w.minimized = false;
+    if (w.normalWindow) workspace.activeWindow = w;
+}
+EOF
+
+name=krita-bureau
+"$qdbus" org.kde.KWin /Scripting org.kde.kwin.Scripting.unloadScript "$name" >/dev/null || true
+id="$("$qdbus" org.kde.KWin /Scripting org.kde.kwin.Scripting.loadScript "$js" "$name")"
+"$qdbus" org.kde.KWin "/Scripting/Script$id" org.kde.kwin.Script.run >/dev/null
+"$qdbus" org.kde.KWin /Scripting org.kde.kwin.Scripting.unloadScript "$name" >/dev/null
+
+pgrep -x krita >/dev/null || setsid -f krita >/dev/null 2>&1

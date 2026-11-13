@@ -53,8 +53,8 @@ machine ce qui n'est plus dans le repo (après sauvegarde), sauf les fichiers ex
 `fish_variables`.
 
 Le repo est public. `dot push` annule le commit s'il trouve un secret (ses propres motifs, puis
-`gitleaks`). Il passe aussi les scripts à `shellcheck` et demande confirmation si quelque chose
-ressort.
+`gitleaks`). Il passe aussi les scripts (`dot`, `lib/`, `bootstrap.sh`, `fl`, `krita-bureau`) à
+`shellcheck` et demande confirmation si quelque chose ressort.
 
 ## Le manifest
 
@@ -94,6 +94,10 @@ Pas suivi, à refaire à la main:
   `~/.config/ssh/common.conf`, inclus par `dot apply`);
 - les clés GPG: copier `~/.gnupg`, ou `gpg --export-secret-keys` puis `gpg --import`;
 - `~/.gitconfig.local`, pour ce qui est propre à une machine (git-lfs sur le Mac).
+- le raccourci KDE du bouton de la télécommande qui amène Krita sur le bureau 4 (Linux):
+  Paramètres système → Clavier → Raccourcis → Ajouter un nouveau → Commande ou script,
+  commande `~/.local/bin/krita-bureau`, raccourci <kbd>Meta+Ctrl+Alt+K</kbd>. Le bouton qui
+  envoie ce raccourci est déjà réglé par `kcminputrc`.
 
 ## Applis à installer soi-même
 
@@ -116,3 +120,6 @@ Installées par `dnf.txt`, mais leurs données ne sont pas suivies:
 - Steam: se reconnecter et retélécharger les jeux (ou copier `~/.local/share/Steam/steamapps`).
 - Krita: réglages, brosses et ressources à refaire (ou copier `~/.local/share/krita` et
   `~/.config/kritarc`).
+  Outil Remplir (Paramètres de l'outil): Seuil 40, Combler l'écart 3 px, Lissage coché,
+  Dilater/contracter 2 px avec le bouton « Arrêter l'agrandissement au pixel le plus sombre »
+  activé. Sans ça, le seau laisse des liserés blancs le long des traits.

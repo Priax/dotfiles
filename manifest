@@ -53,6 +53,8 @@
 ~/.config/pipewire/pipewire.conf.d/60-echo-cancel.conf  # linux
 # Lanceur FL Studio sous Wine (préfixe, micro, MIDI, entrée de menu)
 ~/.local/bin/fl  # linux
+# Bouton de la télécommande XP-Pen: Krita sur le bureau 4 (raccourci KDE Meta+Ctrl+Alt+K)
+~/.local/bin/krita-bureau  # linux
 
 /etc/docker/daemon.json  # linux
 
