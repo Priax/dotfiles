@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# dot: gestion des dotfiles à partir de ./manifest
-#
+# dot: gestion des dotfiles à partir du fichier manifest
 #   dot status    état de chaque fichier (machine vs repo)
 #   dot diff [p]  diff détaillé, filtré sur p si donné
 #   dot save      machine → repo, avec les listes de paquets, sans git
@@ -16,21 +15,23 @@
 set -euo pipefail
 
 # mapfile demande bash 4, macOS fournit bash 3.2
-((BASH_VERSINFO[0] >= 4)) || {
+if ((BASH_VERSINFO[0] < 4)); then
     echo "dot demande bash 4+ (sur Mac: brew install bash)" >&2
     exit 1
-}
+fi
 
 REPO_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
 MANIFEST="$REPO_DIR/manifest"
 BACKUP_DIR="$HOME/dotfiles_backup/$(date +%Y%m%d_%H%M%S)"
+
 # vmlinux.h et *.bpf.o sont générés par « dot tablette »
 EXCLUDES=('*.bak' '*.save' '*.swp' '.git' 'fish_variables' 'vmlinux.h' '*.bpf.o' '__pycache__')
 
 case "$(uname -s)" in
-    Darwin) OS=macos ;;
-    *) OS=linux ;;
+Darwin) OS=macos ;;
+*) OS=linux ;;
 esac
+
 PKG_DIR="$REPO_DIR/packages/$OS"
 
 # shellcheck source=lib/common.sh
@@ -53,30 +54,37 @@ usage() {
     exit "${1:-0}"
 }
 
-main() {
-    case "${1:-}" in
-        status | st) cmd_status ;;
-        diff) cmd_diff "${2:-}" ;;
-        save) cmd_save ;;
-        push) cmd_push ;;
-        apply) cmd_apply ;;
-        pull) cmd_pull ;;
-        after-pull) cmd_after_pull ;; # interne, fin de dot pull
-        install) cmd_install ;;
-        upgrade) cmd_upgrade ;;
-        clean) cmd_clean ;;
-        defaults) cmd_defaults ;;
-        tablette) cmd_tablette ;;
-        -h | --help | help) usage ;;
-        *) usage 1 ;;
-    esac
-    if ((${#FAILURES[@]})); then
-        warn "Étapes en échec:"
-        printf '%s\n' "${FAILURES[@]/#/  - }" >&2
-        exit 1
-    fi
+report_failures() {
+    ((${#FAILURES[@]})) || return 0
+
+    warn "Étapes en échec:"
+    printf '%s\n' "${FAILURES[@]/#/  - }" >&2
+    exit 1
 }
 
-# Tout sur une ligne, en fin de fichier: bash a lu tout le script avant de lancer main, et exit
-# l'empêche de lire la suite. On peut donc modifier dot pendant qu'il tourne (dot pull).
-main "$@"; exit
+main() {
+    case "${1:-}" in
+    status | st) cmd_status ;;
+    diff) cmd_diff "${2:-}" ;;
+    save) cmd_save ;;
+    push) cmd_push ;;
+    apply) cmd_apply ;;
+    pull) cmd_pull ;;
+    after-pull) cmd_after_pull ;;
+    install) cmd_install ;;
+    upgrade) cmd_upgrade ;;
+    clean) cmd_clean ;;
+    defaults) cmd_defaults ;;
+    tablette) cmd_tablette ;;
+    -h | --help | help) usage ;;
+    *) usage 1 ;;
+    esac
+
+    report_failures
+}
+
+# Lancé en un bloc pour être sûr de n'être pas coupé
+{
+    main "$@"
+    exit
+}

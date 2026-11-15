@@ -6,11 +6,24 @@
 #   nvim_maint list <fichier>  retire les plugins sortis de la config (lazy clean), puis écrit dans
 #                              <fichier> les parsers et paquets Mason qu'elle n'utilise plus
 #   nvim_maint remove <fichier>  désinstalle ce que contient <fichier> (après confirmation, dot clean)
+
+LAZY_NOISE=(
+    '(Running|Finished) task'
+    'Récupération du sous-module'
+    'Fetching submodule'
+    'HEAD est maintenant sur'
+    'HEAD is now at'
+)
+
+hide_lazy_noise() {
+    local IFS='|'
+    grep -vE "${LAZY_NOISE[*]}" || true
+}
+
 nvim_maint() {
     have nvim || return 0
-    # On filtre le détail des tâches git de lazy (une dizaine de lignes par plugin). Les erreurs
-    # et les messages du script restent.
+
     DOT_NVIM=$1 DOT_NVIM_LIST=${2:-} nvim --headless -c "luafile $REPO_DIR/lib/nvim_maint.lua" 2>&1 |
-        { grep -vE '(Running|Finished) task|Récupération du sous-module|Fetching submodule|HEAD est maintenant sur|HEAD is now at' || true; } ||
+        hide_lazy_noise ||
         fail "  nvim: échec de l'entretien"
 }

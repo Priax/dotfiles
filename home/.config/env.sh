@@ -1,7 +1,4 @@
-# Environnement commun, en sh POSIX. Lu par ~/.bashrc et ~/.profile (donc aussi zsh, via
-# ~/.zprofile). fish a le même dans config.fish: garder les deux en phase.
-
-# macOS: Homebrew (absent sur Linux)
+# macOS: Homebrew
 if [ -x /opt/homebrew/bin/brew ]; then
     eval "$(/opt/homebrew/bin/brew shellenv)"
 fi
@@ -9,21 +6,18 @@ fi
 export GOPATH="$HOME/go"
 export BUN_INSTALL="$HOME/.bun"
 export EDITOR=nvim
-# paquets npm globaux dans ~/.local, sans sudo, pour tous les npm (système et fnm).
-# Variable plutôt que ~/.npmrc, où npm login écrit son jeton.
 export NPM_CONFIG_PREFIX="$HOME/.local"
 
-# n'ajoute pas un dossier déjà présent (un shell imbriqué relit ce fichier)
 path_prepend() {
     case ":$PATH:" in
-        *":$1:"*) ;;
-        *) PATH="$1:$PATH" ;;
+    *":$1:"*) ;;
+    *) PATH="$1:$PATH" ;;
     esac
 }
 path_append() {
     case ":$PATH:" in
-        *":$1:"*) ;;
-        *) PATH="$PATH:$1" ;;
+    *":$1:"*) ;;
+    *) PATH="$PATH:$1" ;;
     esac
 }
 

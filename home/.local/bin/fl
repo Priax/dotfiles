@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# fl: lanceur FL Studio sous Wine (Fedora + PipeWire)
-#
+# fl: Launcher FL Studio sous Wine (Fedora + PipeWire)
 # Usage:
 #   fl                      lance FL Studio
 #   fl install <setup.exe>  lance un installeur Windows dans le préfixe FL (FL, plugins, Waves Central...)
@@ -13,81 +12,146 @@
 #
 # Variables surchargeables (ex: FL_QUANTUM=512 fl):
 #   WINEPREFIX          préfixe dédié à FL, le dossier qui CONTIENT drive_c
-#   FL_QUANTUM          taille de buffer PipeWire forcée (128/256/512), 0 = ne pas forcer
-#   FL_INPUT_MASTER     nom alsa_input... de ton interface (voir `fl sources`), vide = pas de remap
+#   FL_QUANTUM          taille de buffer PipeWire forcée (128/256/512)
+#   FL_INPUT_MASTER     nom alsa_input... (voir `fl sources`)
 #   FL_INPUT_CHANNELS   canaux réels à garder, ex: aux0,aux1 ou FL,FR
 #   FL_START_WAVES      1 = démarre WavesLocalServer avant FL s'il est installé
-#   FL_VERSION          version à lancer si plusieurs sont installées (ex: 2025), vide = la plus récente
-#   FL_ASIO_INPUT       micro choisi pour FL si aucun ne l'est (défaut: micro du laptop), vide = ne rien faire
+#   FL_VERSION          version à lancer si plusieurs sont installées (ex: 2025)
+#   FL_ASIO_INPUT       micro choisi pour FL si aucun ne l'est (par défaut: micro du laptop)
 #
 # À chaque lancement, fl remet en place: l'entrée de menu « FL Studio » (qui passe par fl), les
-# faux ports MIDI PipeWire désactivés (sinon « Le pilote n'a pas été activé » à chaque démarrage)
-# et le micro du laptop comme entrée de FL (sinon le casque Bluetooth passe en mode appel).
-# `fl install` ne refait que l'entrée de menu.
+# faux ports MIDI PipeWire désactivés et le micro du PC comme entrée de FL
+# `fl install` ne refait que l'entrée de menu, et ajoute les polices Microsoft si elles manquent.
 
 set -uo pipefail
 
 export WINEPREFIX="${WINEPREFIX:-$HOME/flstudio}"
 FL_VERSION="${FL_VERSION:-}"
 FL_ASIO_INPUT="${FL_ASIO_INPUT-sof-hda-dsp Digital Microphone}"
-SELF="$(readlink -f "$0")"
-APPS_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
-ICONS_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/icons/hicolor"
 FL_QUANTUM="${FL_QUANTUM:-256}"
 FL_INPUT_MASTER="${FL_INPUT_MASTER:-}"
 FL_INPUT_CHANNELS="${FL_INPUT_CHANNELS:-aux0,aux1}"
 FL_START_WAVES="${FL_START_WAVES:-1}"
-REMAP_NAME="fl_iface_stereo"
-WAVES_HIDDEN_DIR="$HOME/.local/share/fl-waves-db-hidden"
 
-# Le dossier « Documents » est localisé sur un système en français
+SELF="$(readlink -f "$0")"
+DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}"
+APPS_DIR="$DATA_DIR/applications"
+ICONS_DIR="$DATA_DIR/icons/hicolor"
+WAVES_HIDDEN_DIR="$DATA_DIR/fl-waves-db-hidden"
 DOCS_DIR="$(xdg-user-dir DOCUMENTS 2>/dev/null || echo "$HOME/Documents")"
 FL_DB_DIR="$DOCS_DIR/Image-Line/FL Studio/Presets/Plugin database/Installed"
+FONTS_DIR="$WINEPREFIX/drive_c/windows/Fonts"
+
+REMAP_NAME="fl_iface_stereo"
+NEEDED_FONTS=(arialbd.ttf verdana.ttf)
 
 info() { printf '\033[1;34m[fl]\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m[fl]\033[0m %s\n' "$*" >&2; }
-die()  { printf '\033[1;31m[fl]\033[0m %s\n' "$*" >&2; exit 1; }
+
+die() {
+    printf '\033[1;31m[fl]\033[0m %s\n' "$*" >&2
+    exit 1
+}
 
 need_wine() {
     command -v wine >/dev/null || die "wine introuvable: sudo dnf install wine"
 }
 
-# Un WINEPREFIX qui pointe sur .../drive_c crée un préfixe vide dans le préfixe
 check_prefix() {
     case "$WINEPREFIX" in
-        */drive_c|*/drive_c/) die "WINEPREFIX pointe sur drive_c: il doit pointer sur le dossier parent ($WINEPREFIX)" ;;
+    */drive_c | */drive_c/)
+        die "WINEPREFIX pointe sur drive_c: il doit pointer sur le dossier parent ($WINEPREFIX)"
+        ;;
     esac
-    if [[ -d "$WINEPREFIX/drive_c/drive_c" ]]; then
-        warn "Préfixe doublé détecté: $WINEPREFIX/drive_c/drive_c"
-        warn "Fusion sans écraser: rsync -av --ignore-existing \"$WINEPREFIX/drive_c/drive_c/\" \"$WINEPREFIX/drive_c/\""
+
+    local doubled="$WINEPREFIX/drive_c/drive_c"
+
+    if [[ -d "$doubled" ]]; then
+        warn "Préfixe doublé détecté: $doubled"
+        warn "Fusion sans écraser: rsync -av --ignore-existing \"$doubled/\" \"$WINEPREFIX/drive_c/\""
         warn "Puis compare (users/ ET Program Files/) avant de supprimer quoi que ce soit."
     fi
 }
 
+fl_running() {
+    pgrep -f '[\\/]FL64\.exe' >/dev/null
+}
+
 find_fl_exe() {
-    # Le dossier change selon la version (FL Studio 2024, 2025, 2026...): on prend le plus récent
     local base="$WINEPREFIX/drive_c/Program Files/Image-Line"
-    [[ -n "$FL_VERSION" ]] && base="$base/FL Studio $FL_VERSION"
+
+    if [[ -n "$FL_VERSION" ]]; then
+        base="$base/FL Studio $FL_VERSION"
+    fi
+
     find "$base" -maxdepth 2 -iname 'FL64.exe' 2>/dev/null | sort -V | tail -n1
 }
 
-# Entrée de menu stable « FL Studio » qui passe par ce script, quelle que soit la version.
-# Les entrées que l'installeur Wine crée (FL Studio 2026.desktop...) sont supprimées: elles
-# déclarent la même classe de fenêtre (fl64.exe), et KDE y rattacherait la fenêtre de FL au lieu
-# de l'icône épinglée, ce qui fait deux icônes dans la barre des tâches.
-sync_desktop() {
-    local size icon candidate f
+find_waves_server() {
+    find "$WINEPREFIX/drive_c" -iname 'WavesLocalServer.exe' 2>/dev/null | head -n1
+}
+
+reg_section() {
+    local file="$1"
+    local key="$2"
+    local header="[${key//\\/\\\\}]"
+
+    HEADER="$header" awk '
+        index($0, ENVIRON["HEADER"]) == 1 { inside = 1; next }
+        inside && $0 == ""                { exit }
+        inside                            { print }
+    ' "$file" 2>/dev/null
+}
+
+find_capture_guid() {
+    local name="$1"
+    local prefix='[Software\\Microsoft\\Windows\\CurrentVersion\\MMDevices\\Audio\\Capture\\{'
+
+    NAME="$name" PREFIX="$prefix" awk '
+        index($0, ENVIRON["PREFIX"]) == 1 {
+            start = index($0, "{")
+            end = index($0, "}")
+            guid = substr($0, start, end - start + 1)
+            next
+        }
+
+        /^\[/ { guid = "" }
+
+        guid != "" && index($0, ENVIRON["NAME"]) {
+            print guid
+            exit
+        }
+    ' "$WINEPREFIX/system.reg" 2>/dev/null
+}
+
+update_icons() {
+    local size dir candidate newest
+
     for size in 16 20 24 32 40 48 64 256; do
-        # icône la plus récente (celle de la dernière version installée)
-        icon=""
-        for candidate in "$ICONS_DIR/${size}x${size}/apps/"*_FL64.0.png; do
-            [[ -f "$candidate" && ( -z "$icon" || "$candidate" -nt "$icon" ) ]] && icon="$candidate"
+        dir="$ICONS_DIR/${size}x${size}/apps"
+        newest=""
+
+        for candidate in "$dir/"*_FL64.0.png; do
+            [[ -f "$candidate" ]] || continue
+
+            if [[ -z "$newest" || "$candidate" -nt "$newest" ]]; then
+                newest="$candidate"
+            fi
         done
-        [[ -n "$icon" ]] && cp -f "$icon" "$ICONS_DIR/${size}x${size}/apps/fl-studio.png"
+
+        if [[ -n "$newest" ]]; then
+            cp -f "$newest" "$dir/fl-studio.png"
+        fi
     done
+}
+
+write_desktop_entry() {
+    local target="$APPS_DIR/fl-studio.desktop"
+    local tmp="$target.tmp"
 
     mkdir -p "$APPS_DIR"
-    cat > "$APPS_DIR/fl-studio.desktop.tmp" <<EOF
+
+    cat >"$tmp" <<EOF
 [Desktop Entry]
 Type=Application
 Name=FL Studio
@@ -98,38 +162,54 @@ Categories=AudioVideo;Audio;Midi;
 StartupNotify=true
 StartupWMClass=fl64.exe
 EOF
-    if cmp -s "$APPS_DIR/fl-studio.desktop.tmp" "$APPS_DIR/fl-studio.desktop"; then
-        rm -f "$APPS_DIR/fl-studio.desktop.tmp"
-    else
-        mv -f "$APPS_DIR/fl-studio.desktop.tmp" "$APPS_DIR/fl-studio.desktop"
-    fi
 
+    if cmp -s "$tmp" "$target"; then
+        rm -f "$tmp"
+    else
+        mv -f "$tmp" "$target"
+    fi
+}
+
+remove_wine_entries() {
+    local menus_dir="${XDG_CONFIG_HOME:-$HOME/.config}/menus/applications-merged"
     local removed=0
+    local f
+
     for f in "$APPS_DIR"/wine/Programs/Image-Line/FL\ Studio*.desktop \
-             "${XDG_CONFIG_HOME:-$HOME/.config}"/menus/applications-merged/wine-Programs-Image-Line-FL\ Studio*.menu; do
+        "$menus_dir"/wine-Programs-Image-Line-FL\ Studio*.menu; do
         [[ -f "$f" ]] || continue
         rm -f -- "$f" && removed=1
     done
+
     if [[ $removed == 1 ]]; then
         command -v kbuildsycoca6 >/dev/null && kbuildsycoca6 >/dev/null 2>&1
         info "Entrées de menu en double créées par Wine retirées (l'icône « FL Studio » les remplace)"
     fi
+}
+
+sync_desktop() {
+    update_icons
+    write_desktop_entry
+    remove_wine_entries
     return 0
 }
 
-# Les ports « PipeWire-System » et « PipeWire-RT-Event » ne sont pas de vrais appareils MIDI:
-# FL échoue à les ouvrir. Les réglages FL sont rangés par version (FL Studio 2025 -> clé « FL Studio 25 »).
 disable_fake_midi() {
-    local exe="$1" year ver port key block
+    local exe="$1"
+    local year ver port key
+
     year="$(basename "$(dirname "$exe")")"
     year="${year##* }"
     [[ "$year" =~ ^[0-9]{4}$ ]] || return 0
     ver="${year:2}"
+
     for port in "PipeWire-System - input" "PipeWire-RT-Event - input"; do
         key="Software\\Image-Line\\FL Studio $ver\\Devices\\MIDI input\\$port"
-        # user.reg double les antislashs; le bloc va de l'en-tête à la ligne vide suivante
-        block="$(H="[${key//\\/\\\\}]" awk 'index($0, ENVIRON["H"]) == 1 { f = 1; next } f && /^$/ { exit } f' "$WINEPREFIX/user.reg" 2>/dev/null)"
-        grep -qx '"Enabled"="0"' <<<"$block" && continue
+
+        if reg_section "$WINEPREFIX/user.reg" "$key" | grep -qx '"Enabled"="0"'; then
+            continue
+        fi
+
         if wine reg add "HKCU\\$key" /v Enabled /t REG_SZ /d 0 /f >/dev/null 2>&1; then
             info "Port MIDI factice désactivé: $port"
         else
@@ -138,48 +218,81 @@ disable_fake_midi() {
     done
 }
 
-# Entrée audio de FL Studio ASIO: si aucune n'est choisie, FL prend le micro par défaut, donc le
-# casque Bluetooth, qui bascule alors en mode appel (« mute on » en boucle). On choisit le micro
-# nommé FL_ASIO_INPUT, seulement si l'entrée est vide: un choix fait dans FL n'est jamais écrasé.
-# L'identifiant du micro change d'un préfixe à l'autre, d'où la recherche dans system.reg.
 set_default_asio_input() {
     [[ -n "$FL_ASIO_INPUT" ]] || return 0
-    local block guid
-    block="$(H='[Software\\Image-Line\\ASIO]' awk 'index($0, ENVIRON["H"]) == 1 { f = 1; next } f && /^$/ { exit } f' "$WINEPREFIX/user.reg" 2>/dev/null)"
-    grep -q '^"inputEndPoint"="..*"' <<<"$block" && return 0
-    # Clé MMDevices\Audio\Capture\{GUID}\Properties qui porte le nom du micro
-    guid="$(N="$FL_ASIO_INPUT" awk '
-        /^\[Software\\\\Microsoft\\\\Windows\\\\CurrentVersion\\\\MMDevices\\\\Audio\\\\Capture\\\\\{/ {
-            match($0, /\{[0-9A-Fa-f-]+\}/); g = substr($0, RSTART, RLENGTH); next }
-        /^\[/ { if (!/\\\\Properties\]/) g = "" }
-        g != "" && index($0, ENVIRON["N"]) { print g; exit }' "$WINEPREFIX/system.reg" 2>/dev/null)"
+
+    local key='Software\Image-Line\ASIO'
+    local guid
+
+    if reg_section "$WINEPREFIX/user.reg" "$key" | grep -q '^"inputEndPoint"="[^"]'; then
+        return 0
+    fi
+
+    guid="$(find_capture_guid "$FL_ASIO_INPUT")"
+
     if [[ -z "$guid" ]]; then
         warn "Micro « $FL_ASIO_INPUT » introuvable dans Wine: choisis l'entrée à la main dans FL (Show ASIO panel)"
         return 0
     fi
-    if wine reg add 'HKCU\Software\Image-Line\ASIO' /v inputEndPoint /t REG_SZ /d "{0.0.1.00000000}.$guid" /f >/dev/null 2>&1; then
+
+    if wine reg add "HKCU\\$key" /v inputEndPoint /t REG_SZ \
+        /d "{0.0.1.00000000}.$guid" /f >/dev/null 2>&1; then
         info "Entrée FL Studio ASIO réglée sur « $FL_ASIO_INPUT »"
     else
         warn "Impossible de régler l'entrée FL Studio ASIO"
     fi
 }
 
-find_waves_server() {
-    find "$WINEPREFIX/drive_c" -iname 'WavesLocalServer.exe' 2>/dev/null | head -n1
+missing_fonts() {
+    local font found
+
+    for font in "${NEEDED_FONTS[@]}"; do
+        found="$(find "$FONTS_DIR" -maxdepth 1 -iname "$font" -print -quit 2>/dev/null)"
+
+        if [[ -z "$found" ]]; then
+            echo "$font"
+        fi
+    done
+}
+
+install_fonts() {
+    [[ -z "$(missing_fonts)" ]] && return 0
+
+    if ! command -v winetricks >/dev/null; then
+        warn "Polices manquantes, FLEX plantera: installe winetricks puis relance fl install"
+        return 0
+    fi
+
+    if fl_running; then
+        warn "Ferme FL Studio puis relance fl install pour ajouter les polices dont FLEX a besoin"
+        return 0
+    fi
+
+    wineserver -k 2>/dev/null || true
+
+    info "Installation des polices Microsoft (FLEX en a besoin)"
+    winetricks -q corefonts >/dev/null || warn "winetricks corefonts a échoué: FLEX plantera"
+}
+
+source_exists() {
+    pactl list short sources | awk '{ print $2 }' | grep -qx "$1"
 }
 
 setup_input_remap() {
-    [[ -z "$FL_INPUT_MASTER" ]] && return 0
-    if pactl list short sources | awk '{print $2}' | grep -qx "$REMAP_NAME"; then
-        return 0
-    fi
-    if ! pactl list short sources | awk '{print $2}' | grep -qx "$FL_INPUT_MASTER"; then
+    [[ -n "$FL_INPUT_MASTER" ]] || return 0
+    source_exists "$REMAP_NAME" && return 0
+
+    if ! source_exists "$FL_INPUT_MASTER"; then
         warn "Entrée $FL_INPUT_MASTER absente (interface débranchée ?), pas de remap"
         return 0
     fi
+
     if pactl load-module module-remap-source \
-        source_name="$REMAP_NAME" master="$FL_INPUT_MASTER" channels=2 \
-        master_channel_map="$FL_INPUT_CHANNELS" channel_map=front-left,front-right >/dev/null; then
+        source_name="$REMAP_NAME" \
+        master="$FL_INPUT_MASTER" \
+        channels=2 \
+        master_channel_map="$FL_INPUT_CHANNELS" \
+        channel_map=front-left,front-right >/dev/null; then
         info "Entrée stéréo $REMAP_NAME créée ($FL_INPUT_CHANNELS)"
     else
         warn "Échec du remap de $FL_INPUT_MASTER"
@@ -188,6 +301,7 @@ setup_input_remap() {
 
 set_quantum() {
     [[ "$FL_QUANTUM" == 0 ]] && return 0
+
     if pw-metadata -n settings 0 clock.force-quantum "$FL_QUANTUM" >/dev/null 2>&1; then
         info "Quantum PipeWire forcé à $FL_QUANTUM"
     else
@@ -197,17 +311,21 @@ set_quantum() {
 
 reset_quantum() {
     [[ "$FL_QUANTUM" == 0 ]] && return 0
-    pw-metadata -n settings 0 clock.force-quantum 0 >/dev/null 2>&1 && info "Quantum PipeWire remis en automatique"
+
+    if pw-metadata -n settings 0 clock.force-quantum 0 >/dev/null 2>&1; then
+        info "Quantum PipeWire remis en automatique"
+    fi
 }
 
 start_waves_server() {
     [[ "$FL_START_WAVES" == 1 ]] || return 0
+
     local srv
     srv="$(find_waves_server)"
-    [[ -z "$srv" ]] && return 0
-    if pgrep -f WavesLocalServer >/dev/null; then
-        return 0
-    fi
+
+    [[ -n "$srv" ]] || return 0
+    pgrep -f WavesLocalServer >/dev/null && return 0
+
     info "Démarrage de WavesLocalServer (sinon Waves passe en mode DEMO)"
     wine "$srv" >/dev/null 2>&1 &
     disown
@@ -217,16 +335,21 @@ start_waves_server() {
 cmd_run() {
     need_wine
     check_prefix
+
     local exe
     exe="$(find_fl_exe)"
-    [[ -n "$exe" ]] || die "FL64.exe introuvable dans $WINEPREFIX. Installe FL d'abord: fl install ~/Téléchargements/flstudio_win64_*.exe"
+
+    if [[ -z "$exe" ]]; then
+        die "FL64.exe introuvable dans $WINEPREFIX. Installe FL d'abord: fl install ~/Téléchargements/flstudio_win64_*.exe"
+    fi
 
     sync_desktop
 
-    # FL déjà ouvert (double-clic sur un .flp, deuxième clic sur l'icône): FL64 transmet le fichier
-    # à l'instance existante et quitte tout de suite. Sans cette garde, le trap remettrait le
-    # quantum en automatique alors que la première instance tourne encore.
-    if pgrep -f '[\\/]FL64\.exe' >/dev/null; then
+    if [[ -n "$(missing_fonts)" ]]; then
+        warn "Arial ou Verdana manque dans le préfixe, FLEX plantera (fl install les ajoute)"
+    fi
+
+    if fl_running; then
         info "FL Studio est déjà ouvert, transmission à l'instance existante"
         wine "$exe" "$@"
         return
@@ -240,24 +363,28 @@ cmd_run() {
     start_waves_server
 
     info "Lancement de $exe"
-    # Pas d'exec: on veut revenir ici à la fermeture pour remettre le quantum
     wine "$exe" "$@"
 }
 
 cmd_install() {
     need_wine
     check_prefix
-    [[ $# -ge 1 && -f "$1" ]] || die "Usage: fl install <installeur.exe|.msi>"
+
+    local setup="${1:-}"
+    [[ -f "$setup" ]] || die "Usage: fl install <installeur.exe|.msi>"
+
     if [[ ! -d "$WINEPREFIX" ]]; then
         info "Création du préfixe $WINEPREFIX"
         wineboot -i >/dev/null 2>&1 || die "wineboot a échoué"
     fi
-    case "${1,,}" in
-        *.msi) wine msiexec /i "$1" ;;
-        *)     wine "$1" ;;
+
+    install_fonts
+
+    case "${setup,,}" in
+    *.msi) wine msiexec /i "$setup" ;;
+    *) wine "$setup" ;;
     esac
-    # Pas de `wineserver -w`: il attendrait aussi WavesLocalServer, qui reste ouvert, et bloquerait.
-    # Si l'installeur rend la main avant d'avoir créé ses raccourcis, le prochain `fl` les rattrape.
+
     sync_desktop
     info "Entrée de menu « FL Studio » à jour (passe par fl)"
 }
@@ -265,109 +392,172 @@ cmd_install() {
 cmd_uninstall() {
     need_wine
     check_prefix
-    local base="$WINEPREFIX/drive_c/Program Files/Image-Line"
+
     if [[ "${1:-}" == "--other" ]]; then
         wine uninstaller
         return
     fi
+
+    local base="$WINEPREFIX/drive_c/Program Files/Image-Line"
     local -a dirs=()
     local d
+
     for d in "$base"/FL\ Studio\ [0-9]*; do
         [[ -f "$d/uninstall.exe" ]] && dirs+=("$d")
     done
+
     [[ ${#dirs[@]} -gt 0 ]] || die "Aucune version de FL Studio installée dans $WINEPREFIX"
 
     if [[ -z "${1:-}" ]]; then
         info "Versions installées:"
-        for d in "${dirs[@]}"; do echo "  ${d##*/FL Studio }"; done
+        for d in "${dirs[@]}"; do
+            echo "  ${d##*/FL Studio }"
+        done
         echo "Désinstalle avec: fl uninstall <version>   (ex: fl uninstall ${dirs[-1]##*/FL Studio })"
         return
     fi
 
     local target="$base/FL Studio $1"
     [[ -f "$target/uninstall.exe" ]] || die "FL Studio $1 introuvable (voir: fl uninstall)"
+
     info "Désinstallation de FL Studio $1 (tes projets dans Documents ne sont pas touchés)"
     wine "$target/uninstall.exe"
 }
 
 cmd_sources() {
     pactl list short sources | grep -v '\.monitor' || true
+
     echo
     echo "Copie le nom alsa_input... de ton interface dans FL_INPUT_MASTER."
     echo "Canaux exposés par chaque entrée:"
     LC_ALL=C pactl list sources | grep -E '^\s*(Name|Channel Map):' | grep -v monitor || true
 }
 
-cmd_doctor() {
-    echo "== Wine"
-    command -v wine >/dev/null && wine --version || echo "MANQUANT: sudo dnf install wine"
-
+doctor_prefix() {
     echo "== Préfixe ($WINEPREFIX)"
-    if [[ -d "$WINEPREFIX/drive_c" ]]; then
-        check_prefix && echo "OK"
-        local exe; exe="$(find_fl_exe)"
-        echo "FL64.exe: ${exe:-introuvable}"
-        echo "WavesLocalServer: $(find_waves_server || true)"
-        if command -v wine >/dev/null; then
-            echo "DllOverrides (attention aux entrées préfixées par *):"
-            wine reg query 'HKCU\Software\Wine\DllOverrides' 2>/dev/null | grep -E 'REG_SZ' || echo "  aucun"
-        fi
-    else
+
+    if [[ ! -d "$WINEPREFIX/drive_c" ]]; then
         echo "Pas encore créé (il le sera au premier 'fl install')"
+        return
     fi
 
-    echo "== GPU"
-    if command -v glxinfo >/dev/null; then
-        local r; r="$(glxinfo -B 2>&1 | grep -i 'OpenGL renderer' || echo 'glxinfo a échoué')"
-        echo "$r"
-        grep -qi llvmpipe <<<"$r" && warn "Rendu CPU (llvmpipe): le pilote GPU ne charge pas. Reboot après une mise à jour du pilote ?"
+    check_prefix && echo "OK"
+
+    local exe fonts
+    exe="$(find_fl_exe)"
+    fonts="$(missing_fonts | tr '\n' ' ')"
+
+    echo "FL64.exe: ${exe:-introuvable}"
+    echo "WavesLocalServer: $(find_waves_server || true)"
+
+    if [[ -n "$fonts" ]]; then
+        echo "Polices pour FLEX: MANQUANTES: $fonts"
+    else
+        echo "Polices pour FLEX: OK"
     fi
+
+    if command -v wine >/dev/null; then
+        echo "DllOverrides (attention aux entrées préfixées par *):"
+        wine reg query 'HKCU\Software\Wine\DllOverrides' 2>/dev/null | grep -E 'REG_SZ' || echo "  aucun"
+    fi
+}
+
+doctor_gpu() {
+    echo "== GPU"
+
+    if command -v glxinfo >/dev/null; then
+        local renderer
+        renderer="$(glxinfo -B 2>&1 | grep -i 'OpenGL renderer' || echo 'glxinfo a échoué')"
+
+        echo "$renderer"
+        if grep -qi llvmpipe <<<"$renderer"; then
+            warn "Rendu CPU (llvmpipe): le pilote GPU ne charge pas. Reboot après une mise à jour du pilote ?"
+        fi
+    fi
+
     if [[ -r /proc/driver/nvidia/version ]] && command -v nvidia-smi >/dev/null; then
         echo "Module chargé: $(grep -o 'Kernel Module.*' /proc/driver/nvidia/version)"
         echo "nvidia-smi: $(nvidia-smi --query-gpu=driver_version --format=csv,noheader 2>&1)"
     fi
+}
 
+doctor_audio() {
     echo "== Audio"
-    echo "Quantum forcé: $(pw-metadata -n settings 0 clock.force-quantum 2>/dev/null | grep -o "value:'[0-9]*'" || echo 'aucun')"
-    command -v pw-top >/dev/null && echo "(xruns: pw-top -b -n 3, colonne ERR)"
 
+    local quantum
+    quantum="$(pw-metadata -n settings 0 clock.force-quantum 2>/dev/null | grep -o "value:'[0-9]*'")"
+
+    echo "Quantum forcé: ${quantum:-aucun}"
+    command -v pw-top >/dev/null && echo "(xruns: pw-top -b -n 3, colonne ERR)"
+}
+
+doctor_realtime() {
     echo "== Realtime"
-    local rt; rt="$(ulimit -r)"
+
+    local rt
+    rt="$(ulimit -r)"
+
     echo "ulimit -r = $rt"
     if [[ "$rt" == 0 ]]; then
         warn "Pas de priorité temps réel. Fix Fedora: sudo usermod -aG pipewire \$USER, puis déconnexion/reconnexion (limites dans /etc/security/limits.d/25-pw-rlimits.conf)"
     fi
 }
 
+cmd_doctor() {
+    echo "== Wine"
+    if command -v wine >/dev/null; then
+        wine --version
+    else
+        echo "MANQUANT: sudo dnf install wine"
+    fi
+
+    doctor_prefix
+    doctor_gpu
+    doctor_audio
+    doctor_realtime
+}
+
 cmd_hide_waves() {
-    local n=0 sub
+    local n=0
+    local sub f
+
     for sub in Effects Generators; do
         [[ -d "$FL_DB_DIR/$sub" ]] || continue
         mkdir -p "$WAVES_HIDDEN_DIR/$sub"
+
         while IFS= read -r -d '' f; do
             mv -n -- "$f" "$WAVES_HIDDEN_DIR/$sub/" && n=$((n + 1))
         done < <(find "$FL_DB_DIR/$sub" -type f -iname '*waves*' -print0)
     done
+
     info "$n entrées Waves déplacées vers $WAVES_HIDDEN_DIR (les projets les chargent toujours)"
 }
 
 cmd_unhide_waves() {
     local sub
+
     for sub in Effects Generators; do
         [[ -d "$WAVES_HIDDEN_DIR/$sub" ]] || continue
         mkdir -p "$FL_DB_DIR/$sub"
         find "$WAVES_HIDDEN_DIR/$sub" -mindepth 1 -maxdepth 1 -exec mv -n -t "$FL_DB_DIR/$sub/" {} +
     done
+
     info "Entrées Waves restaurées"
 }
 
 case "${1:-}" in
-    install)      shift; cmd_install "$@" ;;
-    uninstall)    shift; cmd_uninstall "$@" ;;
-    doctor)       cmd_doctor ;;
-    sources)      cmd_sources ;;
-    hide-waves)   cmd_hide_waves ;;
-    unhide-waves) cmd_unhide_waves ;;
-    -h|--help)    sed -n '2,26p' "$0" | sed 's/^# \{0,1\}//' ;;
-    *)            cmd_run "$@" ;;
+install)
+    shift
+    cmd_install "$@"
+    ;;
+uninstall)
+    shift
+    cmd_uninstall "$@"
+    ;;
+doctor) cmd_doctor ;;
+sources) cmd_sources ;;
+hide-waves) cmd_hide_waves ;;
+unhide-waves) cmd_unhide_waves ;;
+-h | --help) sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//' ;;
+*) cmd_run "$@" ;;
 esac

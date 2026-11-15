@@ -1,7 +1,6 @@
 aajohan-comfortaa-fonts
 abrt-cli
 abrt-desktop
-akregator
 alsa-lib-devel
 alsa-sof-firmware
 alsa-utils
@@ -43,6 +42,7 @@ cppcheck
 crontabs
 cscope
 cups-pk-helper
+cyrus-sasl-plain
 default-editor
 default-fonts-cjk-mono
 default-fonts-cjk-sans
@@ -92,6 +92,7 @@ gitleaks
 glfw-devel
 glm-devel
 gnupg2-g13
+gnupg2-scdaemon
 gnupg2-utils
 gnupg2-wks
 godot
@@ -151,18 +152,15 @@ kernel
 kernel-devel
 kf6-baloo-file
 kfind
-kgpg
 khelpcenter
 kinfocenter
 kio-admin
 kio-gdrive
 kjournald
-kleopatra
 kmahjongg
 kmines
 kmouth
 kolourpaint
-kontact
 kpat
 krdc
 krdp
@@ -195,6 +193,7 @@ llvm
 ltrace
 lv2-rubberband-plugins
 mactel-boot
+mariadb-server-utils
 mcelog
 mediawriter
 mesa-compat-libOSMesa

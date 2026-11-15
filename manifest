@@ -1,4 +1,3 @@
-# ~/chemin → home/chemin, /chemin → system/chemin (sudo), « / » final = dossier.
 # « # linux » ou « # macos » en fin de ligne: entrée ignorée sur l'autre OS.
 # « destination < source »: même fichier du repo, posé ailleurs sur cette machine.
 
@@ -8,19 +7,17 @@
 ~/.zprofile                # macos
 ~/.zshenv                  # macos
 ~/.config/fish/
-# PATH, EDITOR…: lu par .bashrc et .profile
 ~/.config/env.sh
 
 ~/.gitconfig
 ~/.config/git/ignore
-# inclus par ~/.ssh/config (non suivi), voir ensure_ssh_include dans dot
+# voir ensure_ssh_include dans dot
 ~/.config/ssh/common.conf
 
 ~/.config/nvim/
 
-# Tablette XP-Pen: assignations des boutons de la télécommande (et réglages souris / pavé tactile),
-# correctif HID-BPF de la télécommande ACK05, compilé et installé par « dot tablette »
 ~/.config/kcminputrc        # linux
+~/.config/autostart/org.kde.kalendarac.desktop  # linux
 ~/src/hid-bpf-ack05/        # linux
 ~/.config/kitty/kitty.conf
 ~/.config/kitty/current-theme.conf
@@ -29,7 +26,6 @@
 ~/.clang-format
 ~/.gdbinit
 
-# Polices perso (la Nerd Font est installée et mise à jour par dot, pas suivie ici)
 ~/.local/share/fonts/Daydream.ttf           # linux
 ~/.local/share/fonts/TexMaths-BB.ttf        # linux
 ~/.local/share/fonts/TexMaths-Cal.ttf       # linux
@@ -49,11 +45,8 @@
 ~/.config/fcitx5/profile   # linux
 ~/.config/fcitx5/config    # linux
 
-# Audio: micro anti-écho par défaut (PipeWire)
 ~/.config/pipewire/pipewire.conf.d/60-echo-cancel.conf  # linux
-# Lanceur FL Studio sous Wine (préfixe, micro, MIDI, entrée de menu)
 ~/.local/bin/fl  # linux
-# Bouton de la télécommande XP-Pen: Krita sur le bureau 4 (raccourci KDE Meta+Ctrl+Alt+K)
 ~/.local/bin/krita-bureau  # linux
 
 /etc/docker/daemon.json  # linux
@@ -63,6 +56,5 @@
 /var/lib/pgsql/data/pg_hba.conf  # linux
 /var/lib/pgsql/data/pg_ident.conf  # linux
 
-# Firefox: relatif au profil par défaut (profiles.ini)
 firefox:chrome/
 firefox:user.js
