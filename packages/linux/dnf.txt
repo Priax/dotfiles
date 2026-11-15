@@ -272,7 +272,7 @@ qemu-guest-agent
 qemu-system-arm
 qemu-system-x86-core
 qrca
-qt6-qtbase-devel
+qt6-qtquick3d-devel
 readline-devel
 remove-retired-packages
 R-knitr
