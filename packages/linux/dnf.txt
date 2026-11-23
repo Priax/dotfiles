@@ -282,7 +282,6 @@ rpmfusion-free-appstream-data
 rpmfusion-free-release
 rpmfusion-nonfree-appstream-data
 rpmfusion-nonfree-release
-rssguard
 rsyslog
 rustup
 sddm-breeze
