@@ -1,6 +1,7 @@
 docker-ce-stable
 fedora
 fedora-cisco-openh264
+ladybird
 pgAdmin4
 rpmfusion-free
 rpmfusion-free-updates

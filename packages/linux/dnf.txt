@@ -173,6 +173,7 @@ kwebkitpart
 kwrite
 kxkb2locale1
 ladspa-rubberband-plugins
+ladybird
 libappindicator-gtk3-devel
 libconfig-devel
 libertas-firmware
