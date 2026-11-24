@@ -77,10 +77,27 @@ upgrade_system() {
     install_nerd_font
 }
 
+# dnf met à jour /usr/bin/rustup-init, jamais la copie de ~/.cargo/bin.
+refresh_rustup() {
+    local init=/usr/bin/rustup-init
+    [[ $OS == linux && -x $init ]] || return 0
+
+    local current packaged
+    current="$(rustup --version 2>/dev/null | awk 'NR == 1 { print $2 }')"
+    packaged="$("$init" --version | awk '{ print $2 }')"
+
+    [[ $current != "$packaged" ]] || return 0
+    [[ "$(printf '%s\n' "$current" "$packaged" | sort -V | tail -n 1)" == "$packaged" ]] || return 0
+
+    info "  rustup: $current → $packaged..."
+    "$init" -y --no-modify-path --default-toolchain none >/dev/null || fail "  échec de rustup-init"
+}
+
 upgrade_rust() {
     have rustup || return 0
 
     info "Rust (toolchains, puis outils cargo)..."
+    refresh_rustup
     rustup update || fail "  échec de rustup update"
 
     if have cargo; then
