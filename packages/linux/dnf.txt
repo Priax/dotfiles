@@ -91,6 +91,7 @@ gimp
 gitleaks
 glfw-devel
 glm-devel
+gmp-devel
 gnupg2-g13
 gnupg2-scdaemon
 gnupg2-utils
@@ -302,7 +303,6 @@ spice-vdagent
 spice-webdavd
 sssd-kcm
 sssd-proxy
-stack
 steam
 strace
 symlinks

@@ -209,7 +209,7 @@ install_dnf_repos() {
     tr '\n' ' ' <"$list"
     echo
 
-    if ask "Ajouter ceux qu'on sait configurer (RPM Fusion, docker-ce, pgAdmin4) ?"; then
+    if ask "Ajouter ceux qu'on sait configurer (RPM Fusion, docker-ce, gh-cli, pgAdmin4) ?"; then
         setup_dnf_repos "$list"
     else
         info "Les paquets venant de dépôts non configurés seront ignorés."

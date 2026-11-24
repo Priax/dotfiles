@@ -136,6 +136,7 @@ setup_dnf_repos() {
 
     local rpmfusion="https://mirrors.rpmfusion.org"
     local docker_repo="https://download.docker.com/linux/fedora/docker-ce.repo"
+    local gh_repo="https://cli.github.com/packages/rpm/gh-cli.repo"
     local pgadmin_repo="https://ftp.postgresql.org/pub/pgadmin/pgadmin4/yum/pgadmin4-fedora-repo-2-1.noarch.rpm"
 
     if grep -q '^rpmfusion-free' "$list"; then
@@ -151,6 +152,11 @@ setup_dnf_repos() {
     if grep -q '^docker-ce' "$list" && [[ ! -f /etc/yum.repos.d/docker-ce.repo ]]; then
         sudo dnf config-manager addrepo --from-repofile="$docker_repo" ||
             fail "  échec du dépôt docker-ce"
+    fi
+
+    if grep -q '^gh-cli' "$list" && [[ ! -f /etc/yum.repos.d/gh-cli.repo ]]; then
+        sudo dnf config-manager addrepo --from-repofile="$gh_repo" ||
+            fail "  échec du dépôt gh-cli"
     fi
 
     if grep -q '^pgAdmin4' "$list"; then
