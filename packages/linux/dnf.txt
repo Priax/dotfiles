@@ -284,7 +284,6 @@ rpmfusion-free-release
 rpmfusion-nonfree-appstream-data
 rpmfusion-nonfree-release
 rsyslog
-rustup
 sddm-breeze
 sddm-kcm
 SDL2_image-devel
