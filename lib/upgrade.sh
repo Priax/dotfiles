@@ -127,6 +127,25 @@ upgrade_deno() {
     deno upgrade || fail "  échec de deno upgrade"
 }
 
+# GOTOOLCHAIN=auto ajoute chaque version demandée sans jamais retirer l'ancienne
+clean_go_toolchains() {
+    have go || return 0
+
+    local base dirs
+    base="$(go env GOMODCACHE)/golang.org"
+    mapfile -t dirs < <(find "$base" -maxdepth 1 -name "toolchain@*" 2>/dev/null | sort -V)
+    ((${#dirs[@]} > 1)) || return 0
+
+    local d v
+    for d in "${dirs[@]:0:${#dirs[@]}-1}"; do
+        v="${d##*/toolchain@}"
+        info "  Go: suppression de l'ancienne toolchain ${v#v0.0.1-}"
+        # le cache des modules est en lecture seule
+        chmod -R u+w "$d"
+        rm -rf "$d" "$(go env GOMODCACHE)/cache/download/golang.org/toolchain/@v/$v".*
+    done
+}
+
 new_kernel_installed() {
     [[ $OS == linux ]] || return 1
     [[ -f /etc/udev-hid-bpf/0010-XPPen__ACK05.bpf.o ]] || return 1
@@ -147,6 +166,7 @@ cmd_upgrade() {
 
     info "nvim (plugins, parsers, paquets Mason)..."
     nvim_maint upgrade
+    clean_go_toolchains
 
     if new_kernel_installed; then
         info "Nouveau noyau: après le redémarrage, « dot tablette » si la télécommande XP-Pen ne marche plus."

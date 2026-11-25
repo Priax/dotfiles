@@ -4,6 +4,8 @@ if [ -x /opt/homebrew/bin/brew ]; then
 fi
 
 export GOPATH="$HOME/go"
+# Fedora force GOTOOLCHAIN=local: on laisse Go télécharger la version qu'un module exige
+export GOTOOLCHAIN=auto
 export BUN_INSTALL="$HOME/.bun"
 export EDITOR=nvim
 export NPM_CONFIG_PREFIX="$HOME/.local"

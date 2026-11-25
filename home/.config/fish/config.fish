@@ -1,5 +1,6 @@
 # Même environnement que ~/.config/env.sh (bash, sh, zsh), à garder en phase
 set -gx GOPATH ~/go
+set -gx GOTOOLCHAIN auto
 set -gx BUN_INSTALL ~/.bun
 set -gx EDITOR nvim
 set -gx NPM_CONFIG_PREFIX ~/.local

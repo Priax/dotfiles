@@ -221,6 +221,13 @@ clean_dev_caches() {
 
     rm -rf "$HOME/.cargo/registry/cache" "$HOME/.cargo/registry/src" "$HOME/.cargo/git/checkouts"
 
+    # symboles de débogage téléchargés par gdb: le client ne fait le ménage
+    # que quand gdb tourne, le cache grossit donc entre deux sessions
+    local debuginfod="${DEBUGINFOD_CACHE_PATH:-${XDG_CACHE_HOME:-$HOME/.cache}/debuginfod_client}"
+    if [[ -d $debuginfod ]]; then
+        find "$debuginfod" -mindepth 1 -maxdepth 1 -type d -exec rm -rf {} + || true
+    fi
+
     if have ghcup; then
         export GHCUP_SKIP_UPDATE_CHECK=1
         ghcup gc --hls-no-ghc --cache --tmpdirs || true
