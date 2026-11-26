@@ -110,6 +110,7 @@ gtk2-immodule-xim
 gtk3-immodule-xim
 gutenprint-cups
 gwenview
+heaptrack
 hyperv-daemons
 ibus-anthy
 ibus-chewing

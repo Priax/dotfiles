@@ -12,5 +12,6 @@ microserver
 sqlx-cli --no-default-features --features postgres
 tauri-cli
 trunk
+twiggy
 wasm-bindgen-cli
 wasm-pack
