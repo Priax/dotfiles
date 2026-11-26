@@ -128,6 +128,7 @@ initial-setup-gui-wayland-plasma
 intel-lpmd
 intel-media-driver
 intel-vsc-firmware
+iproute-tc
 iptstate
 irqbalance
 iwlegacy-firmware
